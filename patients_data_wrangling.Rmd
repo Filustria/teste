@@ -1,0 +1,1104 @@
+---
+title: "Patients Data Wrangling"
+author: "Adelson Guaraci Jantsch"
+output: html_document
+---
+
+
+# Patients Data Wrangling
+
+This chapter is a backup for the code used to clean all datasets.
+
+```{r}
+
+library(tidyverse)
+
+# consultas
+load('C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\extracao1_prime_cap31.RData')
+
+# cadastros
+load('C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\extracao2_prime_cap31.RData')
+
+# sexo corrigido
+corrigido <- read.csv("C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\sexo_corrigido.csv", 
+                      header = TRUE, sep = ";", dec = ",") 
+```
+
+
+
+## "banco31b" DB - 5.854.873 consultations
+
+The SQL-DB extraction contain the following information:
+
+1. "NOME_PROF" - Name of the professional that made the visit and inputed the information
+2. "CBO" - Brazilian code for professional chategories
+3. "ATENDIMENTO_ID" - visit ID
+4. "DATA_CONSULTA" - date of the visit
+5. "MOTIVO_ICPC" - ICPC code
+6. "MOTIVO_OBSERVACOES" - reason for the appointment (open text)
+7. "cid10" - ICD 10
+8. "medicamento" - drugs prescription
+9. "material_exame" - blood tests
+10. "PACIENTE_ID" - patient's ID
+11. "NOME_PAC" - patient's name
+12. "DATA_NASC" - date of birth
+13. "SEXO" - sex
+14. "CNES" - clinic code
+15. "NOME_UNIDADE" - name of the clinic
+
+
+The "banco31b" will have the name "base". Some patients had their information about 'SEX' missing. 98 patients had this information inputed 'by hand'.
+
+```{r}
+
+base <- banco31b %>% drop_na(PACIENTE_ID, DATA_CONSULTA, NOME_PROF) # 342 linhas vazias
+
+comsexo <- base %>% filter(SEXO != 'I') # pacientes com sexo definido
+semsexo <- base %>% filter(SEXO == 'I') # pacientes com sexo definido
+
+
+# Fazendo o append dos pacientes, agora com o sexo definido.
+base <- rbind(comsexo, corrigido)
+base$SEXO <- as.factor(ifelse(base$SEXO == 'M', 'M', 'F'))
+
+
+summary(base$SEXO)
+# 3.722.939 - women
+# 1.693.711 - men
+
+rm(semsexo, comsexo, corrigido)
+
+```
+
+
+
+Now we have 3.722.939 visits for women and 1.693.711 for men.
+
+## Date of birth and Age
+
+The information about date of birth was converted from as.character to as.Date and age was calculated using the last day that we have information inputed in the system - "2018-11-08"
+
+```{r}
+
+base$DATA_NASC <- as.Date(base$DATA_NASC, "%d/%m/%Y")
+base$idade <- round(as.numeric(difftime("2018-11-08", base$DATA_NASC, units = c("days"))/365.25),1)
+
+base$DATA_CONSULTA <- as.Date(base$DATA_CONSULTA, "%d/%m/%Y")
+
+```
+
+## Building DAY, WEEK and MONTH variables
+
+For Pannel Data analysis we'll need to cathegorize day, week and month of information. It was calculated by the difference between the date inputed for the visit and the first day inputed in the system - min(base$DATA_CONSULTA) - which is "2011-12-05"
+
+```{r}
+
+startdate <- min(base$DATA_CONSULTA)
+base$dia  <- as.numeric(difftime(base$DATA_CONSULTA, startdate, units="days") + 1)
+base$semana  <- as.numeric(trunc(difftime(base$DATA_CONSULTA, startdate, units="weeks") + 1))
+base <- base %>% group_by(mes = lubridate::floor_date(DATA_CONSULTA, "month"))
+
+max(base$dia)
+max(base$semana)
+
+```
+
+We have now 2531 days of work, 362 weeks in 6.9 years of information. The 'mes' is a as.Date variable where all consultations in a month were group in the same first day of the month in order to compare consultations in the same month and make it incremental.
+
+
+## Fixing doctors names
+
+Double entry of some names in the system. Probably some patients can have it as well. Here is a very important issue that needs to be solved.
+
+
+```{r}
+
+
+base$NOME_PROF[base$NOME_PROF == '3117 - ADICEA DE SOUZA FERREIRA'] <- 'ADICEA DE SOUZA FERREIRA'
+base$NOME_PROF[base$NOME_PROF == '2888 - SANDRO DA SILVA PRINSCESWAL'] <- 'SANDRO DA SILVA PRINSCESWAL'
+base$NOME_PROF[base$NOME_PROF == 'LUCAS GALHADO DE ARAUJO'] <- 'LUCAS GALHARDO DE ARAUJO'
+base$NOME_PROF[base$NOME_PROF == 'PEDRO DE GALES PERPETUO ROCHA PITTA'] <- 'PEDRO DE GALES PERPETUO ROCHA PITTA SAMPAIO'
+base$NOME_PROF[base$NOME_PROF == 'ANDRE LUIZ  DO AMARAL LIRA'] <- 'ANDRE LUIZ DO AMARAL LIRA'
+
+# Data da primeira consulta em cada clínica
+minimo <- base %>% group_by(NOME_UNIDADE) %>% summarise(primeira_consulta_na_clinica = min(DATA_CONSULTA))
+
+minimo$primeira_consulta_na_clinica <- as.Date(minimo$primeira_consulta_na_clinica)
+
+load("C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\clinicas.RData")
+
+clinicas <- clinicas %>% 
+  filter(CAP == "31") %>% 
+  select(CNES, NOME, EQUIPES, BAIRRO, DATA_INAUGURACAO)
+
+clinicas$DATA_INAUGURACAO <- as.Date(clinicas$DATA_INAUGURACAO)
+
+names(clinicas)[names(clinicas) == 'NOME'] <- 'NOME_UNIDADE'
+
+clinicas$DATA_INAUGURACAO[clinicas$NOME_UNIDADE == "SMS CF WILMA COSTA - AP 31"] <- "2016-09-30"
+clinicas$DATA_INAUGURACAO[clinicas$NOME_UNIDADE == "SMS CF JEREMIAS MORAES DA SILVA - AP 31"] <- "2018-03-02"
+
+
+clinicas <- merge(clinicas, minimo, by = "NOME_UNIDADE", all.x = TRUE)
+
+clinicas$teste <- ifelse(clinicas$DATA_INAUGURACAO > clinicas$primeira_consulta_na_clinica, "problema", "tudo certo")
+
+
+base$NOME_UNIDADE <- as.character(base$NOME_UNIDADE)
+base$NOME_UNIDADE[base$NOME_UNIDADE == "SMS CF KLEBEL DE OLIVEIRA ROCHA - AP 31" & 
+                     base$DATA_CONSULTA < "2016-11-26"] <- "SMS CF FELIPPE CARDOSO - AP 31"
+base$NOME_UNIDADE[base$NOME_UNIDADE == "SMS CF DINIZ BATISTA DOS SANTOS - AP 31" & 
+                     base$DATA_CONSULTA < "2018-03-02"] <- "SMS CF JEREMIAS MORAES DA SILVA - AP 31"
+
+
+# Diniz recebeu os pacientes do parque união e algumas equipes do Hélio smidt
+# SMS CF WILMA COSTA - AP 31 - "2016-09-30"
+# Jeremias pegou as equipes do Samora Machel e Nova Holanda
+
+base$NOME_UNIDADE <- as.factor(base$NOME_UNIDADE)
+
+
+a <- base %>% group_by(NOME_UNIDADE, NOME_PROF) %>% summarise(n = n())
+
+rm(a, minimo, clinicas)
+
+# write.table(a, "C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\a.csv", row.names = FALSE, sep = ";", dec = ",")
+
+
+# save(base, file = "C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\base.RData")
+```
+
+
+
+
+## Loading specialties, types of consultations and labs
+
+```{r}
+
+load('C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\exame_sol.RData')
+load("C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\tipo_consulta.RData")
+mfcs <- read.csv("C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\mfcs.csv", 
+                 header = TRUE, sep = ";", dec = ",")
+
+
+base <- base %>% drop_na(ATENDIMENTO_ID)
+
+consultas <- merge(tipo_consulta, base, by = "ATENDIMENTO_ID", all.x = TRUE)
+
+consultas <- merge(consultas, exame_sol, by = "ATENDIMENTO_ID", all.x = TRUE)
+
+mfcs <- mfcs %>% select(NOME_PROF, MFC) # ainda precisa marcar residentes e rever o arquivo
+
+```
+
+
+Still need to create the categorical variable for Medical Specialty, adding information about residents, years of training, etc. 
+
+
+```{r}
+consultas <- merge(consultas, mfcs, by = c("NOME_PROF"), all.x = TRUE) # retirar o nome da unidade.
+
+consultas$MFCcat <- ifelse(consultas$TIPO_ATENDIMENTO == "Consulta de Enfermagem", "Nurse",
+                           ifelse(consultas$TIPO_ATENDIMENTO == "Consulta de Saúde Bucal", "Dentist",
+                                  ifelse(consultas$TIPO_ATENDIMENTO == "Consulta Médica" & consultas$MFC == 1, 
+                                         "FP", "Generalist")))
+
+
+consultas$MFCcat[is.na(consultas$MFCcat)] <- "Generalist" # os ultimos eram todos generalistas.
+
+consultas$MFCcat <- factor(consultas$MFCcat, levels = c("Generalist", "FP", "Nurse", "Dentist"))
+
+consultas$MFC <- ifelse(consultas$MFCcat == "Generalist", 0,
+                      ifelse(consultas$MFCcat == "FP", 1, NA))
+
+
+consultas$DATA_CONSULTA <- as.Date(consultas$DATA_CONSULTA, format = "%d/%m/%Y")
+consultas$DATA_NASC <- as.Date(consultas$DATA_NASC, format = "%d/%m/%Y")
+
+consultas <- consultas %>% drop_na(NOME_PROF)
+
+
+# save(raiz, file = "C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\tipo_consulta.RData")
+
+
+```
+
+
+## subsetting for medical consultations
+
+The whole dataset is called "consultas" and can be subsetted by using the variable "MFCcat"
+
+```{r}
+
+consultas <- consultas %>% filter(TIPO_ATENDIMENTO == "Consulta Médica")
+
+
+```
+
+
+## Creating dummies for Morbidities
+
+```{r}
+
+## categorizando as morbidades
+
+HAS <- c('I10','I11', 'I12', 'I13', 'I14', 'I15')
+HAScomplicada <- c('I11', 'I12', 'I13', 'I14', 'I15')
+dislipidemia <- c('E78')
+obesidade <- c('E66')
+anemias <- c('D50','D51', 'D52','D53')
+alcool <- c('F10', 'E52', 'G621', 'I426', 'K292', 'K700', 'K703', 'K709', 'T51', 'Z502', 'Z714', 'Z721')
+drogas <- c('F11', 'F12', 'F13', 'F14', 'F15', 'F16', 'F18', 'F19', 'Z715', 'Z722')
+psicoses <- c('F20', 'F22', 'F23', 'F24','F25', 'F28', 'F29', 'F302', 'F312', 'F315')
+depre <- c('F204', 'F313', 'F314', 'F315', 'F32', 'F33', 'F341', 'F412', 'F432')
+hipoT <- c('E00', 'E01', 'E02', 'E03', 'E890')
+arritmia <- c('I441', 'I442', 'I443', 'I456', 'I459', 'I47', 'I48', 'I49', 'R000', 'R001', 'R008', 'T821', 'Z450', 'Z950')
+coagulo <- c('D65', 'D66', 'D67', 'D68', 'D691', 'D693', 'D694', 'D695', 'D696')
+reumato <- c('L940', 'L941', 'L943', 'M05', 'M06', 'M08', 'M120', 'M123', 'M30', 'M310', 
+             'M313', 'M32', 'M33', 'M34', 'M35', 'M45', 'M461', 'M468', 'M469')
+valvular <- c('A520', 'I05', 'I06', 'I07', 'I08', 'I091', 'I098', 'I34', 'I35', 'I36', 'I37', 
+              'I38', 'I39', 'Q230', 'Q231', 'Q232','Q233', 'Z952', 'Z953', 'Z954')
+circ_pulm <- c('I26', 'I27', 'I280', 'I288', 'I289')
+neuro <- c('G10', 'G11', 'G12','G13', 'G20', 'G21', 'G22', 'G254', 'G255', 'G312', 'G318', 
+           'G319', 'G32', 'G35', 'G36', 'G37', 'G40', 'G41', 'G931', 'G934', 'R470', 'R56')
+CI <- c("I21", "I22", "I252")
+ICC <- c('I099', 'I110', 'I130', 'I132', 'I255', 'I420', 'I425', 'I426', 'I427', 'I428', 'I429', 'I43', 'I50', 'P290')
+vascular_periferica <- c('I70', 'I71', 'I731', 'I738', 'I739', 'I771', 'I790', 'I792', 'K551', 'K558', 'K559', 'Z958', 'Z959')
+stroke <- c('G45', 'G46', 'H340', 'I6')
+dementia <- c('F00', 'F01', 'F02', 'F03', 'F051', 'G30', 'G310', 'G311')
+COPD <- c('I278', 'I279', 'J4', 'J60', 'J61', 'J62', 'J63', 'J64', 'J65', 'J66', 'J67', 'J684', 'J701', 'J703')
+peptic <- c('K25', 'K26', 'K27', 'K28')
+DMOK <- c('E100', 'E101', 'E106', 'E108', 'E109', 'E110', 'E111', 'E116', 'E118', 'E119', 'E120', 'E121', 'E126', 'E128', 'E129', 'E130', 'E131', 'E136', 'E138', 'E139', 'E140', 'E141', 'E146', 'E148', 'E149')
+DMcomplica <- c('E102', 'E103', 'E104', 'E105', 'E107', 'E112', 'E113', 'E114', 'E115', 'E117', 'E122', 'E123', 'E124', 'E125', 'E127', 'E132', 'E133', 'E134', 'E135', 'E137', 'E142', 'E143', 'E144', 'E145', 'E147')
+plegia <- c('G041', 'G114', 'G801', 'G802', 'G81', 'G82', 'G830', 'G831', 'G832', 'G833', 'G834', 'G839')
+IRC <- c('I120', 'I131', 'N032', 'N033', 'N034', 'N035', 'N036', 'N037', 'N052', 'N053', 'N054', 'N055', 'N056', 'N057', 'N18', 'N19', 'N250', 'Z490', 'Z491', 'Z492', 'Z940', 'Z992')
+neoplasia <- c('C0', 'C1', 'C20','C21','C22','C23','C24','C25','C26', 'C30', 'C31', 'C32', 'C33', 'C34', 'C37', 'C38', 'C39', 'C40', 'C41', 'C43', 'C45', 'C46', 'C47', 'C48', 'C49', 'C50', 'C51', 'C52', 'C53', 'C54', 'C55', 'C56', 'C57', 'C58', 'C6', 'C70', 'C71', 'C72', 'C73', 'C74', 'C75', 'C76', 'C81', 'C82', 'C83', 'C84', 'C85', 'C88', 'C90', 'C91', 'C92', 'C93', 'C94', 'C95', 'C96', 'C97','C77', 'C78', 'C79', 'C80')
+liver <- c('B18', 'K700', 'K701', 'K702', 'K703', 'K709', 'K713', 'K715', 'K717', 'K73', 'K74', 'K760', 'K762', 'K763', 'K764', 'K768', 'K769', 'Z944','I85', 'I859', 'I864', 'I982', 'K704', 'K711', 'K721', 'K729', 'K765', 'K766', 'K767')
+SIDA <- c('B20', 'B21', 'B22', 'B24')
+
+imunizaveis_csap <- c('A33','A34','A35','A36','A37','A95','B16','B05','B06',
+                 'B26','G000', 'A170', 'A19')
+evitaveis_csap <- c('A15','A16','A18','A171','A172','A173','A174','A175','A176','A177',
+               'A178','A179','I00','I01','I02','A51','A52','A53','B50','B51','B52',
+               'B53','B54','B77')
+gastroenterites_csap <- c('E86','A00','A01','A02','A03','A04','A05','A06',
+                     'A07','A08','A09')
+anemia_csap <- c('D50')
+nutricionais_csap <- c('E40','E41','E42','E43','E44','E45','E46',
+                  'E5','E60','E61','E62','E63','E64')
+orl_csap <- c('H66','J00','J01','J02','J03','J06','J31')
+pneumonias_csap <- c('J13','J14','J153','J154','J158','J159','J181')
+asma_csap <- c('J45','J46')
+pulmonares_csap <- c('J20','J21','J40','J41','J42','J43','J44','J47')
+HAS_csap <- c('I10','I11')
+angina_csap <- c('I20')
+ICC_csap <- c('I50','J81')
+AVC_csap <- c('I63','I64','I65','I66','I67','I69','G45','G46')
+DM_csap <- c('E10','E11','E12','E13','E14')
+epilepsia_csap <- c('G40','G41')
+ITU_csap <- c('N10','N11','N12','N30','N34','N390')
+piodermite_csap <- c('A46','L01','L02','L03','L04','L08')
+DIP_csap <- c('N70','N71','N72','N73','N75','N76')
+peptica_csap <- c('K25','K26','K27','K28','K920','K921','K922')
+parto_csap <- c('O23','A50','P350')
+diu <- c('Z301')
+
+
+consultas$DATA_NUM <- as.numeric(consultas$mes) # first day of the month into a number.
+
+
+## Chronic morbidities
+
+consultas$HAS <- as.numeric(ifelse(grepl(paste(HAS, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$HAScomplicada <- as.numeric(ifelse(grepl(paste(HAScomplicada, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$DMOK <- as.numeric(ifelse(grepl(paste(DMOK, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$DMcomplica <- as.numeric(ifelse(grepl(paste(DMcomplica, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$obesidade <- as.numeric(ifelse(grepl(paste(obesidade, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$dislipidemia <- as.numeric(ifelse(grepl(paste(dislipidemia, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$anemias <- as.numeric(ifelse(grepl(paste(anemias, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$alcool <- as.numeric(ifelse(grepl(paste(alcool, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$drogas <- as.numeric(ifelse(grepl(paste(drogas, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$psicoses <- as.numeric(ifelse(grepl(paste(psicoses, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$depre <- as.numeric(ifelse(grepl(paste(depre, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$hipoT <- as.numeric(ifelse(grepl(paste(hipoT, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$arritmia <- as.numeric(ifelse(grepl(paste(arritmia, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$coagulo <- as.numeric(ifelse(grepl(paste(coagulo, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$reumato <- as.numeric(ifelse(grepl(paste(reumato, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$valvular <- as.numeric(ifelse(grepl(paste(valvular, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$circ_pulm <- as.numeric(ifelse(grepl(paste(circ_pulm, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$neuro <- as.numeric(ifelse(grepl(paste(neuro, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$stroke <- as.numeric(ifelse(grepl(paste(stroke, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$dementia <- as.numeric(ifelse(grepl(paste(dementia, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$CI <- as.numeric(ifelse(grepl(paste(CI, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$ICC <- as.numeric(ifelse(grepl(paste(ICC, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$vascular_periferica <- as.numeric(ifelse(grepl(paste(vascular_periferica, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$COPD <- as.numeric(ifelse(grepl(paste(COPD, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$peptic <- as.numeric(ifelse(grepl(paste(peptic, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$plegia <- as.numeric(ifelse(grepl(paste(plegia, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$IRC <- as.numeric(ifelse(grepl(paste(IRC, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$liver <- as.numeric(ifelse(grepl(paste(liver, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$SIDA <- as.numeric(ifelse(grepl(paste(SIDA, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+
+## CSAPs
+
+consultas$imunizaveis_csap <- as.numeric(ifelse(grepl(paste(imunizaveis_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$evitaveis_csap <- as.numeric(ifelse(grepl(paste(evitaveis_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$gastroenterites_csap <- as.numeric(ifelse(grepl(paste(gastroenterites_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$anemia_csap <- as.numeric(ifelse(grepl(paste(anemia_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$nutricionais_csap <- as.numeric(ifelse(grepl(paste(nutricionais_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$orl_csap <- as.numeric(ifelse(grepl(paste(orl_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$pneumonias_csap <- as.numeric(ifelse(grepl(paste(pneumonias_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$asma_csap <- as.numeric(ifelse(grepl(paste(asma_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$pulmonares_csap <- as.numeric(ifelse(grepl(paste(pulmonares_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$HAS_csap <- as.numeric(ifelse(grepl(paste(HAS_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$angina_csap <- as.numeric(ifelse(grepl(paste(angina_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$ICC_csap <- as.numeric(ifelse(grepl(paste(ICC_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$AVC_csap <- as.numeric(ifelse(grepl(paste(AVC_csap, collapse = "|"),  consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$DM_csap <- as.numeric(ifelse(grepl(paste(DM_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$epilepsia_csap <- as.numeric(ifelse(grepl(paste(epilepsia_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$ITU_csap <- as.numeric(ifelse(grepl(paste(ITU_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$piodermite_csap <- as.numeric(ifelse(grepl(paste(piodermite_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$DIP_csap <- as.numeric(ifelse(grepl(paste(DIP_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$peptica_csap <- as.numeric(ifelse(grepl(paste(peptica_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$parto_csap <- as.numeric(ifelse(grepl(paste(parto_csap, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+consultas$diu <- as.numeric(ifelse(grepl(paste(diu, collapse = "|"), consultas$cid10) == TRUE, consultas$DATA_NUM, NA))
+
+```
+
+
+
+
+## Blood tests and drugs prescribed.
+
+
+```{r, include=FALSE, echo=FALSE}
+
+
+# HEMOGRAM
+hemograma <- c('202020380') 
+consultas$hemograma <- as.integer(ifelse(grepl(paste(hemograma, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# CREATININE
+creatinina <- c('202010317')
+consultas$creatinina <- as.integer(ifelse(grepl(paste(creatinina, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# HDL CHOLESTEROL
+HDL <- c('202010279') 
+consultas$HDL <- as.integer(ifelse(grepl(paste(HDL, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# LDL CHOLESTEROL
+LDL <- c('202010287') 
+consultas$LDL <- as.integer(ifelse(grepl(paste(LDL, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# TOTAL CHOLESTEROL
+CT <- c('202010295') 
+consultas$CT <- as.integer(ifelse(grepl(paste(CT, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# TRIGLYCERID
+TG <- c('202010678') 
+consultas$TG <- as.integer(ifelse(grepl(paste(TG, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# UREA
+ureia <- c('202010694') 
+consultas$ureia <- as.integer(ifelse(grepl(paste(ureia, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# UIC ACID
+urico <- c('202010120') 
+consultas$urico <- as.integer(ifelse(grepl(paste(urico, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# TSH
+TSH <- c('202060250') 
+consultas$TSH <- as.integer(ifelse(grepl(paste(TSH, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# T3
+T3 <- c('202060390') 
+consultas$T3 <- as.integer(ifelse(grepl(paste(T3, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# T4
+T4 <- c('202060373') 
+consultas$T4 <- as.integer(ifelse(grepl(paste(T4, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# FREE T4
+T4L <- c('202060381') 
+consultas$T4L <- as.integer(ifelse(grepl(paste(T4L, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# SODIUM
+sodio <- c('202010635') 
+consultas$sodio <- as.integer(ifelse(grepl(paste(sodio, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# PSA
+PSA <- c('202030105') 
+consultas$PSA <- as.integer(ifelse(grepl(paste(PSA, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+#GLUCOSE
+glicose <- c('202010473') 
+consultas$glicose <- as.integer(ifelse(grepl(paste(glicose, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# HEMOGLOBIN A1C
+A1C <- c('202010503') 
+consultas$A1C <- as.integer(ifelse(grepl(paste(A1C, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# URINE SEDIMENT
+pu <- c('202050017') 
+consultas$pu <- as.integer(ifelse(grepl(paste(pu, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# BILIRRUBINE
+bili <- c('202010201')
+consultas$bili <- as.integer(ifelse(grepl(paste(bili, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# CALCIUM
+calcio <- c('202010210')
+consultas$calcio <- as.integer(ifelse(grepl(paste(calcio, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# GAMA GT
+gamagt <- c('202010465')
+consultas$gamagt <- as.integer(ifelse(grepl(paste(gamagt, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# FSH
+fsh <- c('202060233')
+consultas$fsh <- as.integer(ifelse(grepl(paste(fsh, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# LH
+lh <- c('202060241')
+consultas$lh <- as.integer(ifelse(grepl(paste(lh, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# AST/TGO
+tgo <- c('202010643')
+consultas$tgo <- as.integer(ifelse(grepl(paste(tgo, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# ALT/TGP
+tgp <- c('202010651')
+consultas$tgp <- as.integer(ifelse(grepl(paste(tgp, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# ESR
+vhs <- c('202020150')
+consultas$vhs <- as.integer(ifelse(grepl(paste(vhs, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# TOXOPLASMOSIS IgG
+toxoigg <- c('202030768')
+consultas$toxoigg <- as.integer(ifelse(grepl(paste(toxoigg, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# TOXOPLASMOSIS IgM
+toxoigm <- c('202030873')
+consultas$toxoigm <- as.integer(ifelse(grepl(paste(toxoigm, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# MEASLES IgG
+rubeolaigg <- c('202030814')
+consultas$rubeolaigg <- as.integer(ifelse(grepl(paste(rubeolaigg, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# MEASLES IgM
+rubeolaigm <- c('202030920')
+consultas$rubeolaigm <- as.integer(ifelse(grepl(paste(rubeolaigm, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# ALKALINE FOSFATASE
+fa <- c('202010422')
+consultas$fa <- as.integer(ifelse(grepl(paste(fa, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+# EGGS
+epf <- c('202040127')
+consultas$epf <- as.integer(ifelse(grepl(paste(epf, collapse = "|"), consultas$PROCEDIMENTO_SOLICITADO), consultas$DATA_NUM, NA))
+
+
+
+
+consultas$hemograma_valor <- consultas$hemograma*4.11
+
+consultas$creatinina_valor <- consultas$creatinina*1.85
+
+consultas$HDL_valor <- consultas$HDL*3.51
+
+consultas$LDL_valor <- consultas$LDL*3.51
+
+consultas$CT_valor <- consultas$CT*1.85
+
+consultas$TG_valor <- consultas$TG*3.51
+
+consultas$ureia_valor <- consultas$ureia*1.85
+
+consultas$urico_valor <- consultas$urico*1.85
+
+consultas$TSH_valor <- consultas$TSH*8.96
+
+consultas$T3_valor <- consultas$T3*12.54
+
+consultas$T4_valor <- consultas$T4*8.76
+
+consultas$T4L_valor <- consultas$T4L*11.6
+
+consultas$sodio_valor <- consultas$sodio*1.85
+
+consultas$PSA_valor <- consultas$PSA*16.42
+
+consultas$glicose_valor <- consultas$glicose*1.85
+
+consultas$A1C_valor <- consultas$A1C*7.86
+
+consultas$pu_valor <- consultas$pu*3.70
+
+consultas$bili_valor <- consultas$bili*2.01
+
+consultas$calcio_valor <- consultas$calcio*1.85
+
+consultas$gamagt_valor <- consultas$gamagt*3.51
+
+consultas$fsh_valor <- consultas$fsh*7.89
+
+consultas$lh_valor <- consultas$lh*8.97
+
+consultas$tgo_valor <- consultas$tgo*2.01
+
+consultas$tgp_valor <- consultas$tgp*2.01
+
+consultas$vhs_valor <- consultas$vhs*2.73
+
+consultas$toxoigg_valor <- consultas$toxoigg*16.97
+
+consultas$toxoigm_valor <- consultas$toxoigm*18.55
+
+consultas$rubeolaigg_valor <- consultas$rubeolaigg*17.16
+
+consultas$rubeolaigm_valor <- consultas$rubeolaigm*17.16
+
+consultas$fa_valor <- consultas$fa*2.01
+
+consultas$epf_valor <- consultas$epf*1.65
+
+
+# Prescrição de triciclicos
+tric <- c('TRIPTILINA')
+consultas$triciclico <- as.integer(ifelse(grepl(paste(tric, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# Prescrição de Omeprazol
+omeprazol <- c('OMEPRAZOL')
+consultas$omeprazol <- as.integer(ifelse(grepl(paste(omeprazol, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# Prescrição de benzodiazepínicos
+diazepam <- c('AZEPAM', "AZEPAN")
+consultas$diazepam <- as.integer(ifelse(grepl(paste(diazepam, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# Prescrição de Estatinas
+estatina <- c('STATINA')
+consultas$estatina <- as.integer(ifelse(grepl(paste(estatina, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# Prescrição de Amoxicilina
+amox <- c('AMOXIC')
+consultas$amox <- as.integer(ifelse(grepl(paste(amox, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# Prescrição de AAS 100 mg
+aas <- c('ACIDO ACETILSALICILICO 100MG')
+consultas$aas <- as.integer(ifelse(grepl(paste(aas, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# Prescrição de Penicilina
+pen <- c('PENICILINA')
+consultas$pen <- as.integer(ifelse(grepl(paste(pen, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# Prescrição de AZITROMICINA
+azi <- c('AZITROMICINA')
+consultas$azi <- as.integer(ifelse(grepl(paste(azi, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# Prescrição de CEFALEXINA
+cef <- c('CEFALEXINA')
+consultas$cef <- as.integer(ifelse(grepl(paste(cef, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# Prescrição de Quinolonas
+quino <- c('FLOXACIN')
+consultas$quino <- as.integer(ifelse(grepl(paste(quino, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# METFORMINA
+metformina <- c('METFORMINA')
+consultas$metformina <- as.integer(ifelse(grepl(paste(metformina, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# FLUOXETINA
+fluoxetina <- c('XETINA')
+consultas$fluoxetina <- as.integer(ifelse(grepl(paste(fluoxetina, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# DICLOFENACO
+diclofenaco <- c('DICLOFENACO')
+consultas$diclofenaco <- as.integer(ifelse(grepl(paste(diclofenaco, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# IBUPROFENO
+ibuprofeno <- c('IBUPROFENO')
+consultas$ibuprofeno <- as.integer(ifelse(grepl(paste(ibuprofeno, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# FLUCONAZOL 150 MG
+fluconazol <- c('FLUCONAZOL 150 MG')
+consultas$fluconazol <- as.integer(ifelse(grepl(paste(fluconazol, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+# DIPIRONA
+dipirona <- c('DIPIRONA')
+consultas$dipirona <- as.integer(ifelse(grepl(paste(dipirona, collapse = "|"), consultas$medicamento), consultas$DATA_NUM, NA))
+
+
+```
+
+
+
+```{r}
+# save(consultas, file="C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\ate_agora.RData")
+# load("C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\ate_agora.RData")
+```
+
+
+# Precisa ainda trocar os sexos corrigidos.
+
+
+```{r}
+
+chave <- read.csv("C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\sem_sexo_chave.csv", 
+                      header = TRUE, sep = ";", dec = ",")
+
+cadastrados <- merge(banco31, chave, by = "PACIENTE_ID", all.x = TRUE)
+
+cadastrados$SEXO <- as.factor(ifelse(as.character(cadastrados$SEXO.x == 'I'), 
+                                        as.character(cadastrados$SEXO.y), 
+                                        as.character(cadastrados$SEXO.x)))
+
+cadastrados <- cadastrados %>% drop_na(SEXO) %>% select(-SEXO.x, -SEXO.y)
+
+# 730.740 females
+# 584.354 males
+
+rm(chave, exame_sol, mfcs, tipo_consulta)
+
+cadastrados$NOME_PAC <- as.character(cadastrados$NOME_PAC)
+
+toRemove <- c("OLX", " OLX")
+for (tR in toRemove) {
+  cadastrados$NOME_PAC <- gsub(tR, "", cadastrados$NOME_PAC)
+}
+
+
+
+cadastrados$DATA_NASC <- as.Date(cadastrados$DATA_NASC, "%d/%m/%Y")
+cadastrados$DATA_INSCRICAO <- as.Date(cadastrados$DATA_INSCRICAO, "%d/%m/%Y")
+cadastrados$NOME_PAC <- trimws(as.character(cadastrados$NOME_PAC), "l")
+cadastrados$NOME_PAC <- trimws(as.character(cadastrados$NOME_PAC), "r")
+cadastrados$NOME_MAE <- trimws(as.character(cadastrados$NOME_MAE), "l")
+cadastrados$NOME_MAE <- trimws(as.character(cadastrados$NOME_MAE), "r")
+
+
+# without any correction, we start with 974.243 cluster-IDs
+
+
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "AARON ANASTACIO DE SOUSA CHAMI"] <- "SANDRA MARA DE SOUSA CHAMI"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ABEDELCAR"] <- "ABEDELCAR DAS NEVES ABREU"
+cadastrados$NOME_MAE[cadastrados$NOME_MAE == "CASSIANA"] <- "CASSIANA PANTOJA DAS NEVES"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "AARON MAXWEL DA COSTA BORGES"] <- "AARON MAXWELL DA COSTA BORGES"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ALEX FERREIA SOARES"] <- "ALEX FERREIRA SOARES"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ABDIAS EZEQUIEL DA SILVA"] <- as.Date("1943-12-04")
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ABDIEL ALVES COFFRAU"] <- "ABDIEL ALVES COFFRAN"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ABDON FERREIA DA SILVA"] <- "ABDON FERREIRA DA SILVA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ABDON FERREIA DA SILVA"] <- "MARCELINA MARIA DE LIMA SILVA"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ABDON GUIMEL DA SILVA"] <- as.Date("2003-06-09")
+cadastrados$SEXO[cadastrados$NOME_PAC == "ABDON GUIMEL DA SILVA"] <- "M"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ABEL PINTO BARBOSA"] <- "CONCEICAO PINTO BARBOSA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ABEL RAFAEL DE SOUZA"] <- "OLINDINA SOARES DA SILVA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ABELARDO LINO DA COSTA"] <- "MARIA FRANCISCA DA COSTA"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ABIDIAS ALVES DE ASSIS TAV"] <- "ABIDIAS ALVES DE ASSIS"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ABIGAIL DE AVILA DOS SANTOS"] <- "CLEONICE TOMAZ DOS SANTOS"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ABIGAIL FERREIRA SOARES"] <- as.Date("1943-03-21")
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ABINAI RODRIGUES DE SOUZA"] <- "CANDIDA FURTADO DE SOUZA"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ABINAI RODRIGUES DE SOUZA"] <- "ABINAI RODRIGUES DE SOUZA"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ABMAEL JONATHAS ALBES DA SILVA SOUSA"] <- "ABMAEL JONATHAS ALVES DA SILVA SOUSA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ABNER ALMEIDA MARTINS"] <- "VERONICA MARIA DE ALMEIDA"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ABNER DE BARROS FULY BRANDAO"] <- as.Date("1999-10-30")
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ABNER PEREIRA DE SOUSA"] <- "ABNER PEREIRA DE SOUZA"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ABRAAO ALENCAR DA GOIS"] <- "ABRAAO ALENCAR DE GOIS"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ABRAAO ALENCAR DE GOIS"] <- "LUCIVANIA SANTOS ALENCAR"
+cadastrados$SEXO[cadastrados$NOME_PAC == "ABRAAO CAMPOS DOS SANTOS"] <- "M"
+cadastrados$SEXO[cadastrados$NOME_PAC == "ABRAAO DA COSTA"] <- "M"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ABRAAO DA SILVA SOARES"] <- "EMILIA DE JESUS DA SILVA"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ABRAAO ALENCAR DE GOIS"] <- as.Date("2006-11-29")
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ABRAO LEANDRO RODRIGUES SANTOS"] <- "REGINA MARIA RODRIGUES SANTOS"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ABRAO TEODORO COCCO PEREIRA"] <- "ABRAO TEOBALDO COCCO PEREIRA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ABRAO TEOBALDO COCCO PEREIRA"] <- "SONIA MARIA COCCO NASCIMENTO PEREIRA"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ACACIA DE SOUZA MOTA CARDOSO"] <- "ACACIA DE SOUZA MOTTA CARDOSO"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACACIA DE SOUZA MOTTA CARDOSO"] <- "ANA CORREIA MOTA"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ACACIA DE SOUZA MOTTA CARDOSO"] <- as.Date("1921-11-05")
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ACACIA MIGUEL"] <- "ACACIA MIGUEL ZUMBILA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACACIA MIGUEL"] <- "MARIA SOUZA BIBIANA"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ACACIO JOSE GONCALVES CASTRO"] <- as.Date("1965-11-03")
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACACIO JOSE GONCALVES CASTRO"] <- "MARIA IRIA GONCALVES CASTRO"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACACIO PEREIRA GONCALVES"] <- "ENMA PEREIRA GONCALVES"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACASIA KONGOLO"] <- "SOUZY KONGOLO KABEDI"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ACASIA KONGOLO"] <- as.Date("2008-12-30")
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ACASSIO ALVES DA SILVA"] <- as.Date("2008-10-25")
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ACELANY BARBOSA FONTINELES"] <- "ACELANY BARBOSA FONTENELLES"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ACELANY FONTENELLES BARBOSA"] <- "ACELANY BARBOSA FONTENELLES"
+cadastrados$NOME_MAE[cadastrados$NOME_MAE == "MERY LUCIA BARBOSA FONTENELES"] <- "MERY LUCIA BARBOSA FONTENELLES"
+cadastrados$NOME_MAE[cadastrados$NOME_MAE == "MERY LUCIO BARBOSA FONTENELES"] <- "MERY LUCIA BARBOSA FONTENELLES"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACELINA MOREIRA DO CARMO"] <- "HILARIO JOSE MOREIRA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACELINA PEREIRA LESSA"] <- "EURIDES RANGEL LESSA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACELIO MARCOS BARBOSA FONTENELES"] <- "MERY LUCIA BARBOSA FONTINELES"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACILDA ARAUJO DA SILVA"] <- "NEIDE MARIA ARAUJO DA SILVA"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ACIMAR JARDER BEZZERRA"] <- "ACIMAR JARDER BEZERRA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACIMAR JARDER BEZERRA"] <- NA
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ACIMAR JARDER BEZERRA"] <- as.Date("1975-05-09")
+cadastrados$SEXO[cadastrados$NOME_PAC == "ACIMAR JARDER BEZERRA"] <- "F"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACIR FREITAS MARTINS"] <- "ACIR DE FREITAS MARTINS"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACIR DE FREITAS MARTINS"] <- "NILFA BARBOSA DE FREITAS"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ACIR DE FREITAS MARTINS"] <- as.Date("1946-07-04")
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ACSA RANGEL DA SILVA"] <- "ACSA RANGEL ARAUJO DA SILVA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACUCENA CRISTINA GOMES COUTINHO"] <- "CRISTIANE DOS SANTOS GOMES COUTINHO"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "AÇUCENA KELLY SILVA"] <- "ACUCENA KELY SILVA SERRA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACUCENA KELY SILVA SERRA"] <- "KELI REGINA SILVA SERRA"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ACUCENA KELY SILVA SERRA"] <- as.Date("1997-12-27")
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ACY MARVILLA"] <- "ACY MARVILHA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACY MARVILHA"] <- "ZENAIDE DA PENHA MARVILHA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ACYR MARIANO DA SILVA"] <- "LOURDES MARIANO DA SILVA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ADAIL SOUZA BRITO"] <- "MARIA DO SOCORRO DE SOUZA BRITO"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ADAIL SOUZA BRITO"] <- as.Date("1977-02-05")
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ADAILSON VIRGINIO DE OLIVEIRA"] <- "LUCIA MARIA VIRGINIO DE OLIVEIRA"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ADAILSON VIRGINIO DE OLIVIRA"] <- "ADAILSON VIRGINIO DE OLIVEIRA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ADAILTON ALVES CARDOSO"] <- "MARIA DA PENHA CORREIA CARDOSO"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ADAILTON ALVES CARDOSO"] <- as.Date("1962-11-26")
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ADAILTON ANTONIO BRAZ"] <- "ANTONIA BRAZ SOBRINHO"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ADAILTON ANTONIO BRAZ"] <- as.Date("1981-06-10")
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ADAILTON DA CONCEICAO PINTO SANTOS"] <- "ADAILTON DA CONCEICAO PEREIRA SANTOS"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ADAILTON DA SILVA SANTOS"] <- "ANGELINA MENDES DA SILVA"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ADAILTON DA SILVA SANTOS"] <- as.Date("1986-08-13")
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ADAILTON DOMINGOS DE BRITO"] <- "LINDALVA DOMINGOS DE BRITO"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ADAILTON DOS SANTOS"] <- "ISABEL DOS SANTOS"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ADAILTON DOUGLAS FONSECA"] <- "ADAILTON DOUGLAS FONSECA COSTA"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ADAILTON GONCALVES DE SOUZA"] <- "ADAILTON GONCALVES SOUZA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ADAILTON GONCALVES SOUZA"] <- "MARIA GONCALVES SOUZA"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ADAILZA G DA SILVA"] <- "ADAILZA GOMES DA SILVA"
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ADAILZA GOMES BARBOSA"] <- "ADAILZA GOMES DA SILVA"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ADAILZA GOMES DA SILVA"] <- "HELENA MARIA DA SILVA"
+cadastrados$DATA_NASC[cadastrados$NOME_PAC == "ADAILZA GOMES DA SILVA"] <- as.Date("1969-03-14")
+cadastrados$NOME_PAC[cadastrados$NOME_PAC == "ADAILZA MARIA BITENCURT DE FREITAS"] <- "ADAILZA MARIA BITTENCOURT DOS REIS"
+cadastrados$NOME_MAE[cadastrados$NOME_PAC == "ADAILZA MARIA BITENCURT DE FREITAS"] <- "ANISIA LUIZA BITTENCOURT DOS REIS"
+
+# cluster_cadastro = 1500 of 1.245.699
+
+# max(cadastrados$cluster_ID)
+# 974.204
+# 974.212
+# 974.230
+# 974.243
+
+cadastrados <- arrange(cadastrados, NOME_PAC)
+###########
+
+cadastrados <- cadastrados %>% distinct(PACIENTE_ID, DATA_INSCRICAO, NOME_UNIDADE, .keep_all = TRUE)
+
+### creation of cluster_ID
+
+nome <- with(cadastrados, paste(NOME_PAC, SEXO))
+cadastrados <- within(cadastrados, cluster_nome <- match(nome, unique(nome)))
+
+
+comb <- with(cadastrados, paste(NOME_PAC, DATA_NASC, SEXO))
+cadastrados <- within(cadastrados, cluster_ID <- match(comb, unique(comb)))
+
+cadastrados$micro <- as.factor(paste(cadastrados$NOME_UNIDADE, cadastrados$MICRO_AREA, sep=";"))
+
+combs <- with(cadastrados, paste(NOME_PAC, DATA_NASC, SEXO, micro))
+cadastrados <- within(cadastrados, cluster_cadastro <- match(combs, unique(combs)))
+
+cadastrados <- cadastrados %>% 
+  select(PACIENTE_ID, cluster_nome, cluster_ID, cluster_cadastro, NOME_PAC, NOME_MAE, DATA_NASC, 
+         SEXO, micro, NUM_SUS, TIPO_LOGRADOURO_ENDERECO, NOME_LOGRADOURO, NUM_ENDERECO, 
+         BAIRRO_ENDERECO, FAMILIA_ID, CNES, NOME_UNIDADE, DATA_INSCRICAO, SITUACAO_PACIENTE, MICRO_AREA)
+
+cadastrados <- cadastrados[order(cadastrados$NOME_PAC),]
+
+```
+
+
+## criando as datas de inicio e de final de participacao
+
+```{r}
+
+
+load("C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\clinicas.RData")
+
+clinicas <- clinicas %>% 
+  filter(CAP == "31") %>% 
+  select(CNES, NOME, EQUIPES, BAIRRO, DATA_INAUGURACAO)
+
+clinicas$DATA_INAUGURACAO <- as.Date(clinicas$DATA_INAUGURACAO)
+
+names(clinicas)[names(clinicas) == 'NOME'] <- 'NOME_UNIDADE'
+
+clinicas$DATA_INAUGURACAO[clinicas$NOME_UNIDADE == "SMS CF WILMA COSTA - AP 31"] <- "2016-09-30"
+clinicas$DATA_INAUGURACAO[clinicas$NOME_UNIDADE == "SMS CF JEREMIAS MORAES DA SILVA - AP 31"] <- "2018-03-02"
+
+clinicas <- clinicas %>% select(NOME_UNIDADE, DATA_INAUGURACAO)
+
+cadastrados <- merge(cadastrados, clinicas, by = "NOME_UNIDADE", all.x = TRUE)
+
+cadastrados$inicio <- as.Date(ifelse(cadastrados$DATA_INSCRICAO < cadastrados$DATA_INAUGURACAO, 
+                                     cadastrados$DATA_INAUGURACAO, cadastrados$DATA_INSCRICAO),
+                        origin = "1970-01-01")
+
+cadastrados <- cadastrados %>% 
+    group_by(cluster_ID) %>% 
+    mutate(primeira_inscricao = if(all(is.na(inicio))) NA else min(inicio, na.rm = TRUE), 
+              ver_primeira_consulta = is.na(primeira_inscricao))
+
+cadastrados$problema_data_inscricao <-  ifelse(cadastrados$primeira_inscricao >= cadastrados$DATA_INAUGURACAO, 
+                                "OK", "problema de cadastro")
+cadastrados$problema_data_inscricao[is.na(cadastrados$problema_data_inscricao)] <- "ver primeira consulta"
+cadastrados$problema_data_inscricao <- as.factor(cadastrados$problema_data_inscricao)
+
+summary(cadastrados$problema_data_inscricao)
+
+load("C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\acs.RData")
+
+acs$DATA_ATENDIMENTO_ACS <- as.Date(acs$DATA_ATENDIMENTO_ACS, format = "%Y/%m/%d")
+
+a <- acs %>% 
+  group_by(PACIENTE_ID) %>% 
+  mutate(min_acs = min(DATA_ATENDIMENTO_ACS),
+         max_acs = max(DATA_ATENDIMENTO_ACS)) %>%
+  distinct(PACIENTE_ID, .keep_all = TRUE) 
+
+a <- a %>% select(PACIENTE_ID, min_acs, max_acs)
+
+cadastrados <- merge(cadastrados, a, by = "PACIENTE_ID", all.x = TRUE)
+
+rm(a, acs, clinicas)
+
+cadastrados <- cadastrados[order(cadastrados$NOME_PAC),]
+
+
+```
+
+Adding the "cluster_ID" information to the "consult" BD.
+
+```{r}
+
+cluster_ID <- cadastrados %>% select(PACIENTE_ID, cluster_ID)
+
+save(cluster_ID, 
+     file = 'C:\\Users\\Adelson\\Desktop\\pendrive\\bancos_workspace\\cluster_ID.RData')
+
+consult <- consultas[,c(1:74)]
+
+consult <- consult %>% filter(TIPO_ATENDIMENTO == "Consulta Médica")
+
+
+consult <- merge(consult, cluster_ID, by = "PACIENTE_ID", all.x = TRUE)
+
+consult <- consult %>% distinct()
+
+
+# talvez seja melhor pegar a clinica do paciente pelo local onde aconteceram.
+
+qual <- consult %>% group_by(cluster_ID, NOME_UNIDADE) %>% summarise(consultas = n()) # 570.141 pacientes
+
+unicos <- qual %>% group_by(cluster_ID) %>% filter(n() == 1) # 492.949 pacientes com consultas exclusivas na mesma clinica
+
+dobrados <- qual %>% group_by(cluster_ID) %>% filter(n() > 1) # 77.192 pacientes com consultas em dois lugares diferentes 
+
+
+
+# now we have every cluster_ID in the dataset. Those who never had a consultation end up having "NA" at "DATA_CONSULTA" variable.
+
+## Last date
+
+# The variable 'ultima' will mark the Date of the last appointment the patient had.
+
+
+## Data da última consulta
+consult <- consult %>%
+  group_by(cluster_ID) %>%
+  mutate(primeira_consulta = if(all(is.na(DATA_CONSULTA))) NA else min(DATA_CONSULTA, na.rm = TRUE),
+         ultima_consulta = if(all(is.na(DATA_CONSULTA))) NA else max(DATA_CONSULTA, na.rm = TRUE))
+
+
+consult$MFCcat <- as.character(consult$MFCcat)
+consult$MFCcat[is.na(consult$MFCcat)] <- c("sem_consulta")
+consult$MFCcat <- as.factor(consult$MFCcat)
+summary(consult$MFCcat)
+```
+
+
+
+## Preparing the "pacientes" Dataset
+
+```{r}
+
+
+numero_consultas <- consult %>% 
+  group_by(cluster_ID, MFCcat) %>%
+  summarise(consultas = n())
+
+
+# Information about the number of visits with FP, Generalist and Nurse each patient had.
+data.table::setDT(numero_consultas)
+wide <- data.table::dcast(numero_consultas, cluster_ID ~ MFCcat, value.var = "consultas")
+
+wide[is.na(wide)] <- 0
+
+wide$total_medicas <- wide$Generalist + wide$FP
+
+wide$Generalistpercent <- wide$Generalist*100/wide$total_medicas
+wide$FPpercent <- wide$FP*100/wide$total_medicas
+
+
+
+doencas <- consult[,c(75:77, 16, 25:74)] # aqui precisa pegar a variável "cluster_ID"
+
+  
+# Corrigir isso aqui
+doenca <- doencas %>% group_by(cluster_ID, NOME_UNIDADE) %>% summarise_all(min, na.rm=TRUE)
+
+is.na(doenca) <- sapply(doenca, is.infinite)
+
+doenca[ , 5:54] <- lapply(doenca[ , 5:54], as.Date, origin = "1970-01-01")
+
+
+# O banco pacientes tem 623.010 pessoas que fizeram ao menos uma consulta medica ou de enfermagem na clinica. 
+pacientes <- merge(wide, doenca, by = "cluster_ID")
+
+# save(pacientes, file="C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\pacientes_que_consultaram.RData")
+
+# load("C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\pacientes_que_consultaram.RData")
+
+```
+
+
+# Aqui precisa fazer com que todas as datas estejam presentes para determinar quando o paciente começa a contar o tempo e quando deixa de contar.
+
+continuar aqui 
+
+```{r}
+
+a <- cadastrados %>% filter(!is.na(MICRO_AREA))
+
+micros <- cadastrados %>% select(PACIENTE_ID, micro, MICRO_AREA, cluster_ID)
+
+micros <- micros %>% distinct()
+
+teste <- merge(consultas, micros, by = "PACIENTE_ID", all.x = TRUE)
+
+teste <- teste %>% distinct()
+
+
+####
+
+cads <- merge(cadastrados, cadastrados, by = "PACIENTE_ID", all = TRUE)
+
+
+
+sem_micro <- cadastrados %>% 
+  select(PACIENTE_ID, NOME_UNIDADE, MICRO_AREA, micro) %>% 
+  filter(!is.na(MICRO_AREA))
+
+com_micro <- cadastrados %>% 
+  select(PACIENTE_ID, NOME_UNIDADE, MICRO_AREA, micro) %>% 
+  filter(is.na(MICRO_AREA))
+
+cola_micro <- merge(sem_micro, com_micro, all = TRUE, by = "PACIENTE_ID")
+
+cola_micro <- cola_micro %>% distinct()
+
+cola_micro <- cola_micro %>% distinct(PACIENTE_ID, .keep_all = TRUE)
+
+
+
+
+cadastros <- merge(cadastrados, pacientes, by = c("cluster_ID", "NOME_UNIDADE"), all.x = TRUE)
+
+cadastros$primeira_inscricao <- as.Date(ifelse(!is.na(cadastros$min_acs) & 
+                                         cadastros$min_acs < cadastros$primeira_inscricao, 
+                                       cadastros$min_acs, cadastros$primeira_inscricao), origin = "1970-01-01")
+
+
+# 974.204 pacientes cadastrados
+teste <- cadastros %>% 
+  distinct(PACIENTE_ID, .keep_all = TRUE)
+
+cadastros$consulta <- as.factor(ifelse(is.na(cadastros$total_medicas), "sem_consulta", "com_consulta"))
+
+# removing observations that are duplicated, with no information about "DATA_INSCRICAO" or have no "total_medicas"
+
+teste <- cadastros %>% select(-FAMILIA_ID)
+
+teste <- teste %>% 
+  group_by(cluster_ID) %>% 
+  mutate(duplicado = n() > 1) %>% 
+  filter(!(duplicado == TRUE & is.na(DATA_INSCRICAO) & is.na(total_medicas))) %>%
+  distinct()
+
+# 1.118.414 observations
+
+### Tem problemas acima. As consultas ficaram duplicadas em todos os PACIENTE_ID, pois o merge foi feito sobre o cluster_ID.
+
+
+
+# cadastros %>% group_by(cluster_ID) %>% summarise(consulta)
+
+# 886.356 pacientes com ao menos uma informação de data
+cadastros <- cadastros %>% 
+  filter(!is.na(primeira_consulta) | !is.na(ultima_consulta))
+
+
+cadastros <- cadastros %>%
+  mutate(min = pmin(primeira_consulta, ultima_consulta, na.rm = TRUE),
+         max = pmax(primeira_consulta, ultima_consulta, na.rm = TRUE)) %>% 
+  mutate(min_tres = as.Date(min) - 90, 
+         max_dois = as.Date(max) + 60,
+         max_tres = as.Date(max) + 90) %>%
+  mutate(time_spam = ifelse(max > min, "longitudinal", 
+                            ifelse(max < min, "chabu", "puntual")))
+
+summary(as.factor(cadastros$time_spam))
+
+# longitudinal = 539.012
+# puntual = 329.386
+
+# longitudinal = 886.356
+
+cadastros$age <- as.numeric(difftime(cadastros$min, cadastros$DATA_NASC, units = "days")/365.25)
+
+# save(cadastros, file="C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\cadastros.RData")
+
+```
+
+
+The dataset "pacientes" summarises all the information about morbidities for every patient that had one consultation at least. It has 602.422 observations representing 61.8% of the 974.594 subscribed at the clinics. 
+
+The dataset "consultas" summarises all the information of every consultation done by physicians and nurses. It has 4.839.716 observations and information about day, week, month, age, sex, profesional category, professional specialty, morbidities, drugs prescribed and blood tests ordered.
+
+
+```{r}
+# load("C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\cadastros.RData")
+```
+
+
+
+## exemplo para o stackoverflow
+
+```{r}
+HBP <- as.Date(c(NA, NA, "2013-08-01", NA, "2017-11-01", NA, NA, NA, NA, NA))
+
+min <- as.Date(c("2017-05-19", "2013-03-27", "2013-08-01", "2013-04-24", "2013-05-08", 
+                 "2013-03-21","2013-04-08","2013-08-01","2016-09-12", "2016-06-13"))
+
+max <- as.Date(c("2017-05-19","2014-09-12","2018-09-24","2013-04-24","2018-07-31",
+                 "2018-04-17","2018-04-11","2017-02-07","2016-09-12", "2016-06-13"))
+
+df <- data.frame(HBP, min, max)
+
+month <- round_date(seq.Date(as.Date("2012-02-02"), as.Date("2018-11-08"), by = "months"), "month")
+
+
+df$interval <- interval(df$min, df$max)
+
+df$month1 <- month[1] %within% df$interval
+df$month2 <- month[2] %within% df$interval
+
+
+df$month65 <- month[65] %within% df$interval
+
+
+dummies <- lapply(month, function(x) {x %within% df$interval})
+dummies <- as.data.frame(matrix(unlist(dummies), ncol = length(month)))
+colnames(dummies) <- paste0("month", 1:length(month))
+df <- cbind(df, dummies)
+
+
+```
