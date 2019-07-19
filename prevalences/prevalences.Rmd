@@ -1,0 +1,1113 @@
+# Prevalences over time
+
+
+```{r}
+
+library(tidyverse)
+library(lubridate)
+
+load("C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\ate_agora.RData")
+load("C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\cadastros.RData")
+
+```
+
+
+
+```{r}
+adultos <- cadastros %>% filter(age > 18 & time_spam == "longitudinal")
+
+adultos$novo_min <- as.Date(ifelse(adultos$min < 15796, 15796, adultos$min), origin = "1970-01-01")
+
+# creating a sequence of months, from the first to the last month of consultations
+library(lubridate)
+month <- c(round_date(seq.Date(min(adultos$min), max(adultos$max), by = "months"), "month"))
+
+adultos$arrive <- ymd(adultos$min_tres)
+adultos$leave <- ymd(adultos$max_tres)
+
+```
+
+
+```{r}
+adultos$interval <- interval(adultos$arrive, adultos$leave)
+denominador <- lapply(month, function(x) {sum(x %within% adultos$interval)})
+
+adultos$intervalHAS <- interval(adultos$HAS, adultos$leave)
+HAS <- lapply(month, function(x) {sum(x %within% adultos$intervalHAS, na.rm = TRUE)})
+
+adultos$intervalHAScomplicada <- interval(adultos$HAScomplicada, adultos$leave)
+HAScomplicada <- lapply(month, function(x) {sum(x %within% adultos$intervalHAScomplicada, na.rm = TRUE)})
+
+adultos$intervalDMOK <- interval(adultos$DMOK, adultos$leave)
+DMOK <- lapply(month, function(x) {sum(x %within% adultos$intervalDMOK, na.rm = TRUE)})
+
+adultos$intervalDMcomplica <- interval(adultos$DMcomplica, adultos$leave)
+DMcomplica <- lapply(month, function(x) {sum(x %within% adultos$intervalDMcomplica, na.rm = TRUE)})
+
+adultos$intervalobesidade <- interval(adultos$obesidade, adultos$leave)
+obesidade <- lapply(month, function(x) {sum(x %within% adultos$intervalobesidade, na.rm = TRUE)})
+
+adultos$intervaldislipidemia <- interval(adultos$dislipidemia, adultos$leave)
+dislipidemia <- lapply(month, function(x) {sum(x %within% adultos$intervaldislipidemia, na.rm = TRUE)})
+
+adultos$intervalanemias <- interval(adultos$anemias, adultos$leave)
+anemias <- lapply(month, function(x) {sum(x %within% adultos$intervalanemias, na.rm = TRUE)})
+
+adultos$intervalalcool <- interval(adultos$alcool, adultos$leave)
+alcool <- lapply(month, function(x) {sum(x %within% adultos$intervalalcool, na.rm = TRUE)})
+
+adultos$intervaldrogas <- interval(adultos$drogas, adultos$leave)
+drogas <- lapply(month, function(x) {sum(x %within% adultos$intervaldrogas, na.rm = TRUE)})
+
+adultos$intervalpsicoses <- interval(adultos$psicoses, adultos$leave)
+psicoses <- lapply(month, function(x) {sum(x %within% adultos$intervalpsicoses, na.rm = TRUE)})
+
+adultos$intervaldepre <- interval(adultos$depre, adultos$leave)
+depre <- lapply(month, function(x) {sum(x %within% adultos$intervaldepre, na.rm = TRUE)})
+
+adultos$intervalhipoT <- interval(adultos$hipoT, adultos$leave)
+hipoT <- lapply(month, function(x) {sum(x %within% adultos$intervalhipoT, na.rm = TRUE)})
+
+adultos$intervalarritmia <- interval(adultos$arritmia, adultos$leave)
+arritmia <- lapply(month, function(x) {sum(x %within% adultos$intervalarritmia, na.rm = TRUE)})
+
+adultos$intervalcoagulo <- interval(adultos$coagulo, adultos$leave)
+coagulo <- lapply(month, function(x) {sum(x %within% adultos$intervalcoagulo, na.rm = TRUE)})
+
+adultos$intervalreumato <- interval(adultos$reumato, adultos$leave)
+reumato <- lapply(month, function(x) {sum(x %within% adultos$intervalreumato, na.rm = TRUE)})
+
+adultos$intervalvalvular <- interval(adultos$valvular, adultos$leave)
+valvular <- lapply(month, function(x) {sum(x %within% adultos$intervalvalvular, na.rm = TRUE)})
+
+adultos$intervalcirc_pulm <- interval(adultos$circ_pulm, adultos$leave)
+circ_pulm <- lapply(month, function(x) {sum(x %within% adultos$intervalcirc_pulm, na.rm = TRUE)})
+
+adultos$intervalneuro <- interval(adultos$neuro, adultos$leave)
+neuro <- lapply(month, function(x) {sum(x %within% adultos$intervalneuro, na.rm = TRUE)})
+
+adultos$intervalstroke <- interval(adultos$stroke, adultos$leave)
+stroke <- lapply(month, function(x) {sum(x %within% adultos$intervalstroke, na.rm = TRUE)})
+
+adultos$intervaldementia <- interval(adultos$dementia, adultos$leave)
+dementia <- lapply(month, function(x) {sum(x %within% adultos$intervaldementia, na.rm = TRUE)})
+
+adultos$intervalCI <- interval(adultos$CI, adultos$leave)
+CI <- lapply(month, function(x) {sum(x %within% adultos$intervalCI, na.rm = TRUE)})
+
+adultos$intervalICC <- interval(adultos$ICC, adultos$leave)
+ICC <- lapply(month, function(x) {sum(x %within% adultos$intervalICC, na.rm = TRUE)})
+
+adultos$intervalvascular_periferica <- interval(adultos$vascular_periferica, adultos$leave)
+vascular_periferica <- lapply(month, function(x) {sum(x %within% adultos$intervalvascular_periferica, na.rm = TRUE)})
+
+adultos$intervalCOPD <- interval(adultos$COPD, adultos$leave)
+COPD <- lapply(month, function(x) {sum(x %within% adultos$intervalCOPD, na.rm = TRUE)})
+
+adultos$intervalpeptic <- interval(adultos$peptic, adultos$leave)
+peptic <- lapply(month, function(x) {sum(x %within% adultos$intervalpeptic, na.rm = TRUE)})
+
+adultos$intervalplegia <- interval(adultos$plegia, adultos$leave)
+plegia <- lapply(month, function(x) {sum(x %within% adultos$intervalplegia, na.rm = TRUE)})
+
+adultos$intervalIRC <- interval(adultos$IRC, adultos$leave)
+IRC <- lapply(month, function(x) {sum(x %within% adultos$intervalIRC, na.rm = TRUE)})
+
+adultos$intervalliver <- interval(adultos$liver, adultos$leave)
+liver <- lapply(month, function(x) {sum(x %within% adultos$intervalliver, na.rm = TRUE)})
+
+adultos$intervalSIDA <- interval(adultos$SIDA, adultos$leave)
+SIDA <- lapply(month, function(x) {sum(x %within% adultos$intervalSIDA, na.rm = TRUE)})
+
+adultos$intervaldiu <- interval(adultos$diu, adultos$leave)
+diu <- lapply(month, function(x) {sum(x %within% adultos$intervaldiu, na.rm = TRUE)})
+
+mes <- as.numeric(month)
+
+df <- do.call(rbind.data.frame, 
+              Map('c', mes, denominador, HAS, HAScomplicada, DMOK, 
+                  DMcomplica, obesidade, dislipidemia, anemias, alcool,
+                  drogas, psicoses, depre, hipoT, arritmia, coagulo, reumato, 
+                  valvular, circ_pulm, neuro, stroke, dementia, CI, ICC,
+                  vascular_periferica, COPD, peptic, plegia, IRC, liver, SIDA, diu))
+
+
+colnames(df) <- c("month", "denominador", "HAS", "HAScomplicada", "DMOK", "DMcomplica", "obesidade",
+                  "dislipidemia", "anemias", "alcool", "drogas", "psicoses", "depre", "hipoT", "arritmia",
+                  "coagulo", "reumato", "valvular", "circ_pulm", "neuro", "stroke", "dementia", "CI",
+                  "ICC", "vascular_periferica", "COPD", "peptic", "plegia", "IRC", "liver", "SIDA", "diu")
+
+df$month <- as.Date(df$month, origin = "1970-01-01")
+
+
+# save(df, file = "C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\df_pevalencias.RData")
+
+```
+
+
+
+```{r}
+
+
+## , , , , , , , , , , , , , , , , , , imunizaveis_csap, evitaveis_csap, gastroenterites_csap, anemia_csap, nutricionais_csap, orl_csap, pneumonias_csap, asma_csap, pulmonares_csap, HAS_csap, angina_csap, ICC_csap, AVC_csap, DM_csap, epilepsia_csap, ITU_csap, piodermite_csap, DIP_csap, peptica_csap, parto_csap, diu
+
+
+
+```
+
+
+```{r}
+
+# load("C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\df_pevalencias.RData")
+
+prevs <- df %>% 
+  mutate(prev_HAS = HAS/denominador*100,
+         prev_HAScomplicada = HAScomplicada/denominador*100,
+         prev_DMOK = DMOK/denominador*100,
+         prev_DMcomplica = DMcomplica/denominador*100,
+         prev_obesidade = obesidade/denominador*100,
+         prev_dislipidemia = dislipidemia/denominador*100,
+         prev_anemias = anemias/denominador*100,
+         prev_alcool = alcool/denominador*100,
+         prev_drogas = drogas/denominador*100,
+         prev_DMcomplica = DMcomplica/denominador*100,
+         prev_psicoses = psicoses/denominador*100,
+         prev_depre = depre/denominador*100,
+         prev_hipoT = hipoT/denominador*100,
+         prev_arritmia = arritmia/denominador*100,
+         prev_coagulo = coagulo/denominador*100,
+         prev_reumato = reumato/denominador*100,
+         prev_valvular = valvular/denominador*100,
+         prev_circ_pulm = circ_pulm/denominador*100,
+         prev_neuro = neuro/denominador*100,
+         prev_stroke = stroke/denominador*100,
+         prev_dementia = dementia/denominador*100,
+         prev_CI = CI/denominador*100,
+         prev_ICC = ICC/denominador*100,
+         prev_vascular_periferica = vascular_periferica/denominador*100,
+         prev_COPD = COPD/denominador*100,
+         prev_peptic = peptic/denominador*100,
+         prev_plegia = plegia/denominador*100,
+         prev_IRC = IRC/denominador*100,
+         prev_liver = liver/denominador*100,
+         prev_SIDA = SIDA/denominador*100,
+         prev_diu = diu/denominador*100)
+
+
+
+plot(prevs$month, prevs$prev_DMOK)
+
+## df <- data.frame(month, denominador, HAS, HAScomplicada, DMOK, DMcomplica, obesidade, dislipidemia, anemias, alcool, drogas, psicoses, depre, hipoT, arritmia, coagulo, reumato, valvular, circ_pulm, neuro, stroke, dementia, CI, ICC, vascular_periferica, COPD, peptic, plegia, IRC, liver, SIDA, imunizaveis_csap, evitaveis_csap, gastroenterites_csap, anemia_csap, nutricionais_csap, orl_csap, pneumonias_csap, asma_csap, pulmonares_csap, HAS_csap, angina_csap, ICC_csap, AVC_csap, DM_csap, epilepsia_csap, ITU_csap, piodermite_csap, DIP_csap, peptica_csap, parto_csap, diu)
+
+
+```
+
+
+
+```{r}
+
+
+generalista <- adultos %>% filter(Generalistpercent == 100)
+
+generalista$interval <- interval(generalista$arrive, generalista$leave)
+denominador <- lapply(month, function(x) {sum(x %within% generalista$interval)})
+
+generalista$intervalHAS <- interval(generalista$HAS, generalista$leave)
+HAS <- lapply(month, function(x) {sum(x %within% generalista$intervalHAS, na.rm = TRUE)})
+
+generalista$intervalHAScomplicada <- interval(generalista$HAScomplicada, generalista$leave)
+HAScomplicada <- lapply(month, function(x) {sum(x %within% generalista$intervalHAScomplicada, na.rm = TRUE)})
+
+generalista$intervalDMOK <- interval(generalista$DMOK, generalista$leave)
+DMOK <- lapply(month, function(x) {sum(x %within% generalista$intervalDMOK, na.rm = TRUE)})
+
+generalista$intervalDMcomplica <- interval(generalista$DMcomplica, generalista$leave)
+DMcomplica <- lapply(month, function(x) {sum(x %within% generalista$intervalDMcomplica, na.rm = TRUE)})
+
+generalista$intervalobesidade <- interval(generalista$obesidade, generalista$leave)
+obesidade <- lapply(month, function(x) {sum(x %within% generalista$intervalobesidade, na.rm = TRUE)})
+
+generalista$intervaldislipidemia <- interval(generalista$dislipidemia, generalista$leave)
+dislipidemia <- lapply(month, function(x) {sum(x %within% generalista$intervaldislipidemia, na.rm = TRUE)})
+
+generalista$intervalanemias <- interval(generalista$anemias, generalista$leave)
+anemias <- lapply(month, function(x) {sum(x %within% generalista$intervalanemias, na.rm = TRUE)})
+
+generalista$intervalalcool <- interval(generalista$alcool, generalista$leave)
+alcool <- lapply(month, function(x) {sum(x %within% generalista$intervalalcool, na.rm = TRUE)})
+
+generalista$intervaldrogas <- interval(generalista$drogas, generalista$leave)
+drogas <- lapply(month, function(x) {sum(x %within% generalista$intervaldrogas, na.rm = TRUE)})
+
+generalista$intervalpsicoses <- interval(generalista$psicoses, generalista$leave)
+psicoses <- lapply(month, function(x) {sum(x %within% generalista$intervalpsicoses, na.rm = TRUE)})
+
+generalista$intervaldepre <- interval(generalista$depre, generalista$leave)
+depre <- lapply(month, function(x) {sum(x %within% generalista$intervaldepre, na.rm = TRUE)})
+
+generalista$intervalhipoT <- interval(generalista$hipoT, generalista$leave)
+hipoT <- lapply(month, function(x) {sum(x %within% generalista$intervalhipoT, na.rm = TRUE)})
+
+generalista$intervalarritmia <- interval(generalista$arritmia, generalista$leave)
+arritmia <- lapply(month, function(x) {sum(x %within% generalista$intervalarritmia, na.rm = TRUE)})
+
+generalista$intervalcoagulo <- interval(generalista$coagulo, generalista$leave)
+coagulo <- lapply(month, function(x) {sum(x %within% generalista$intervalcoagulo, na.rm = TRUE)})
+
+generalista$intervalreumato <- interval(generalista$reumato, generalista$leave)
+reumato <- lapply(month, function(x) {sum(x %within% generalista$intervalreumato, na.rm = TRUE)})
+
+generalista$intervalvalvular <- interval(generalista$valvular, generalista$leave)
+valvular <- lapply(month, function(x) {sum(x %within% generalista$intervalvalvular, na.rm = TRUE)})
+
+generalista$intervalcirc_pulm <- interval(generalista$circ_pulm, generalista$leave)
+circ_pulm <- lapply(month, function(x) {sum(x %within% generalista$intervalcirc_pulm, na.rm = TRUE)})
+
+generalista$intervalneuro <- interval(generalista$neuro, generalista$leave)
+neuro <- lapply(month, function(x) {sum(x %within% generalista$intervalneuro, na.rm = TRUE)})
+
+generalista$intervalstroke <- interval(generalista$stroke, generalista$leave)
+stroke <- lapply(month, function(x) {sum(x %within% generalista$intervalstroke, na.rm = TRUE)})
+
+generalista$intervaldementia <- interval(generalista$dementia, generalista$leave)
+dementia <- lapply(month, function(x) {sum(x %within% generalista$intervaldementia, na.rm = TRUE)})
+
+generalista$intervalCI <- interval(generalista$CI, generalista$leave)
+CI <- lapply(month, function(x) {sum(x %within% generalista$intervalCI, na.rm = TRUE)})
+
+generalista$intervalICC <- interval(generalista$ICC, generalista$leave)
+ICC <- lapply(month, function(x) {sum(x %within% generalista$intervalICC, na.rm = TRUE)})
+
+generalista$intervalvascular_periferica <- interval(generalista$vascular_periferica, generalista$leave)
+vascular_periferica <- lapply(month, function(x) {sum(x %within% generalista$intervalvascular_periferica, na.rm = TRUE)})
+
+generalista$intervalCOPD <- interval(generalista$COPD, generalista$leave)
+COPD <- lapply(month, function(x) {sum(x %within% generalista$intervalCOPD, na.rm = TRUE)})
+
+generalista$intervalpeptic <- interval(generalista$peptic, generalista$leave)
+peptic <- lapply(month, function(x) {sum(x %within% generalista$intervalpeptic, na.rm = TRUE)})
+
+generalista$intervalplegia <- interval(generalista$plegia, generalista$leave)
+plegia <- lapply(month, function(x) {sum(x %within% generalista$intervalplegia, na.rm = TRUE)})
+
+generalista$intervalIRC <- interval(generalista$IRC, generalista$leave)
+IRC <- lapply(month, function(x) {sum(x %within% generalista$intervalIRC, na.rm = TRUE)})
+
+generalista$intervalliver <- interval(generalista$liver, generalista$leave)
+liver <- lapply(month, function(x) {sum(x %within% generalista$intervalliver, na.rm = TRUE)})
+
+generalista$intervalSIDA <- interval(generalista$SIDA, generalista$leave)
+SIDA <- lapply(month, function(x) {sum(x %within% generalista$intervalSIDA, na.rm = TRUE)})
+
+generalista$intervaldiu <- interval(generalista$diu, generalista$leave)
+diu <- lapply(month, function(x) {sum(x %within% generalista$intervaldiu, na.rm = TRUE)})
+
+mes <- as.numeric(month)
+
+df_generalista <- do.call(rbind.data.frame, 
+              Map('c', mes, denominador, HAS, HAScomplicada, DMOK, 
+                  DMcomplica, obesidade, dislipidemia, anemias, alcool,
+                  drogas, psicoses, depre, hipoT, arritmia, coagulo, reumato, 
+                  valvular, circ_pulm, neuro, stroke, dementia, CI, ICC,
+                  vascular_periferica, COPD, peptic, plegia, IRC, liver, SIDA, diu))
+
+
+colnames(df_generalista) <- c("month", "denominador", "HAS", "HAScomplicada", "DMOK", "DMcomplica", "obesidade",
+                  "dislipidemia", "anemias", "alcool", "drogas", "psicoses", "depre", "hipoT", "arritmia",
+                  "coagulo", "reumato", "valvular", "circ_pulm", "neuro", "stroke", "dementia", "CI",
+                  "ICC", "vascular_periferica", "COPD", "peptic", "plegia", "IRC", "liver", "SIDA", "diu")
+
+df_generalista$month <- as.Date(df_generalista$month, origin = "1970-01-01")
+
+
+# save(df_generalista, file = "C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\df_generalista.RData")
+
+##
+
+familia <- adultos %>% filter(Generalistpercent == 0)
+
+familia$interval <- interval(familia$arrive, familia$leave)
+denominador <- lapply(month, function(x) {sum(x %within% familia$interval)})
+
+familia$intervalHAS <- interval(familia$HAS, familia$leave)
+HAS <- lapply(month, function(x) {sum(x %within% familia$intervalHAS, na.rm = TRUE)})
+
+familia$intervalHAScomplicada <- interval(familia$HAScomplicada, familia$leave)
+HAScomplicada <- lapply(month, function(x) {sum(x %within% familia$intervalHAScomplicada, na.rm = TRUE)})
+
+familia$intervalDMOK <- interval(familia$DMOK, familia$leave)
+DMOK <- lapply(month, function(x) {sum(x %within% familia$intervalDMOK, na.rm = TRUE)})
+
+familia$intervalDMcomplica <- interval(familia$DMcomplica, familia$leave)
+DMcomplica <- lapply(month, function(x) {sum(x %within% familia$intervalDMcomplica, na.rm = TRUE)})
+
+familia$intervalobesidade <- interval(familia$obesidade, familia$leave)
+obesidade <- lapply(month, function(x) {sum(x %within% familia$intervalobesidade, na.rm = TRUE)})
+
+familia$intervaldislipidemia <- interval(familia$dislipidemia, familia$leave)
+dislipidemia <- lapply(month, function(x) {sum(x %within% familia$intervaldislipidemia, na.rm = TRUE)})
+
+familia$intervalanemias <- interval(familia$anemias, familia$leave)
+anemias <- lapply(month, function(x) {sum(x %within% familia$intervalanemias, na.rm = TRUE)})
+
+familia$intervalalcool <- interval(familia$alcool, familia$leave)
+alcool <- lapply(month, function(x) {sum(x %within% familia$intervalalcool, na.rm = TRUE)})
+
+familia$intervaldrogas <- interval(familia$drogas, familia$leave)
+drogas <- lapply(month, function(x) {sum(x %within% familia$intervaldrogas, na.rm = TRUE)})
+
+familia$intervalpsicoses <- interval(familia$psicoses, familia$leave)
+psicoses <- lapply(month, function(x) {sum(x %within% familia$intervalpsicoses, na.rm = TRUE)})
+
+familia$intervaldepre <- interval(familia$depre, familia$leave)
+depre <- lapply(month, function(x) {sum(x %within% familia$intervaldepre, na.rm = TRUE)})
+
+familia$intervalhipoT <- interval(familia$hipoT, familia$leave)
+hipoT <- lapply(month, function(x) {sum(x %within% familia$intervalhipoT, na.rm = TRUE)})
+
+familia$intervalarritmia <- interval(familia$arritmia, familia$leave)
+arritmia <- lapply(month, function(x) {sum(x %within% familia$intervalarritmia, na.rm = TRUE)})
+
+familia$intervalcoagulo <- interval(familia$coagulo, familia$leave)
+coagulo <- lapply(month, function(x) {sum(x %within% familia$intervalcoagulo, na.rm = TRUE)})
+
+familia$intervalreumato <- interval(familia$reumato, familia$leave)
+reumato <- lapply(month, function(x) {sum(x %within% familia$intervalreumato, na.rm = TRUE)})
+
+familia$intervalvalvular <- interval(familia$valvular, familia$leave)
+valvular <- lapply(month, function(x) {sum(x %within% familia$intervalvalvular, na.rm = TRUE)})
+
+familia$intervalcirc_pulm <- interval(familia$circ_pulm, familia$leave)
+circ_pulm <- lapply(month, function(x) {sum(x %within% familia$intervalcirc_pulm, na.rm = TRUE)})
+
+familia$intervalneuro <- interval(familia$neuro, familia$leave)
+neuro <- lapply(month, function(x) {sum(x %within% familia$intervalneuro, na.rm = TRUE)})
+
+familia$intervalstroke <- interval(familia$stroke, familia$leave)
+stroke <- lapply(month, function(x) {sum(x %within% familia$intervalstroke, na.rm = TRUE)})
+
+familia$intervaldementia <- interval(familia$dementia, familia$leave)
+dementia <- lapply(month, function(x) {sum(x %within% familia$intervaldementia, na.rm = TRUE)})
+
+familia$intervalCI <- interval(familia$CI, familia$leave)
+CI <- lapply(month, function(x) {sum(x %within% familia$intervalCI, na.rm = TRUE)})
+
+familia$intervalICC <- interval(familia$ICC, familia$leave)
+ICC <- lapply(month, function(x) {sum(x %within% familia$intervalICC, na.rm = TRUE)})
+
+familia$intervalvascular_periferica <- interval(familia$vascular_periferica, familia$leave)
+vascular_periferica <- lapply(month, function(x) {sum(x %within% familia$intervalvascular_periferica, na.rm = TRUE)})
+
+familia$intervalCOPD <- interval(familia$COPD, familia$leave)
+COPD <- lapply(month, function(x) {sum(x %within% familia$intervalCOPD, na.rm = TRUE)})
+
+familia$intervalpeptic <- interval(familia$peptic, familia$leave)
+peptic <- lapply(month, function(x) {sum(x %within% familia$intervalpeptic, na.rm = TRUE)})
+
+familia$intervalplegia <- interval(familia$plegia, familia$leave)
+plegia <- lapply(month, function(x) {sum(x %within% familia$intervalplegia, na.rm = TRUE)})
+
+familia$intervalIRC <- interval(familia$IRC, familia$leave)
+IRC <- lapply(month, function(x) {sum(x %within% familia$intervalIRC, na.rm = TRUE)})
+
+familia$intervalliver <- interval(familia$liver, familia$leave)
+liver <- lapply(month, function(x) {sum(x %within% familia$intervalliver, na.rm = TRUE)})
+
+familia$intervalSIDA <- interval(familia$SIDA, familia$leave)
+SIDA <- lapply(month, function(x) {sum(x %within% familia$intervalSIDA, na.rm = TRUE)})
+
+familia$intervaldiu <- interval(familia$diu, familia$leave)
+diu <- lapply(month, function(x) {sum(x %within% familia$intervaldiu, na.rm = TRUE)})
+
+mes <- as.numeric(month)
+
+df_familia <- do.call(rbind.data.frame, 
+              Map('c', mes, denominador, HAS, HAScomplicada, DMOK, 
+                  DMcomplica, obesidade, dislipidemia, anemias, alcool,
+                  drogas, psicoses, depre, hipoT, arritmia, coagulo, reumato, 
+                  valvular, circ_pulm, neuro, stroke, dementia, CI, ICC,
+                  vascular_periferica, COPD, peptic, plegia, IRC, liver, SIDA, diu))
+
+
+colnames(df_familia) <- c("month", "denominador", "HAS", "HAScomplicada", "DMOK", "DMcomplica", "obesidade",
+                  "dislipidemia", "anemias", "alcool", "drogas", "psicoses", "depre", "hipoT", "arritmia",
+                  "coagulo", "reumato", "valvular", "circ_pulm", "neuro", "stroke", "dementia", "CI",
+                  "ICC", "vascular_periferica", "COPD", "peptic", "plegia", "IRC", "liver", "SIDA", "diu")
+
+df_familia$month <- as.Date(df_familia$month, origin = "1970-01-01")
+
+# save(df_familia, file = "C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\df_familia.RData")
+
+
+
+
+df_generalista <- df_generalista %>% filter(month > "2013-04-01")
+
+prevs_generalista <- df_generalista %>% 
+  mutate(prev_HAS = HAS/denominador*100,
+         prev_HAScomplicada = HAScomplicada/denominador*100,
+         prev_DMOK = DMOK/denominador*100,
+         prev_DMcomplica = DMcomplica/denominador*100,
+         prev_obesidade = obesidade/denominador*100,
+         prev_dislipidemia = dislipidemia/denominador*100,
+         prev_anemias = anemias/denominador*100,
+         prev_alcool = alcool/denominador*100,
+         prev_drogas = drogas/denominador*100,
+         prev_DMcomplica = DMcomplica/denominador*100,
+         prev_psicoses = psicoses/denominador*100,
+         prev_depre = depre/denominador*100,
+         prev_hipoT = hipoT/denominador*100,
+         prev_arritmia = arritmia/denominador*100,
+         prev_coagulo = coagulo/denominador*100,
+         prev_reumato = reumato/denominador*100,
+         prev_valvular = valvular/denominador*100,
+         prev_circ_pulm = circ_pulm/denominador*100,
+         prev_neuro = neuro/denominador*100,
+         prev_stroke = stroke/denominador*100,
+         prev_dementia = dementia/denominador*100,
+         prev_CI = CI/denominador*100,
+         prev_ICC = ICC/denominador*100,
+         prev_vascular_periferica = vascular_periferica/denominador*100,
+         prev_COPD = COPD/denominador*100,
+         prev_peptic = peptic/denominador*100,
+         prev_plegia = plegia/denominador*100,
+         prev_IRC = IRC/denominador*100,
+         prev_liver = liver/denominador*100,
+         prev_SIDA = SIDA/denominador*100,
+         prev_diu = diu/denominador*100)
+
+df_familia <- df_familia %>% filter(month > "2013-04-01")
+
+prevs_familia <- df_familia %>% 
+  mutate(prev_HAS = HAS/denominador*100,
+         prev_HAScomplicada = HAScomplicada/denominador*100,
+         prev_DMOK = DMOK/denominador*100,
+         prev_DMcomplica = DMcomplica/denominador*100,
+         prev_obesidade = obesidade/denominador*100,
+         prev_dislipidemia = dislipidemia/denominador*100,
+         prev_anemias = anemias/denominador*100,
+         prev_alcool = alcool/denominador*100,
+         prev_drogas = drogas/denominador*100,
+         prev_DMcomplica = DMcomplica/denominador*100,
+         prev_psicoses = psicoses/denominador*100,
+         prev_depre = depre/denominador*100,
+         prev_hipoT = hipoT/denominador*100,
+         prev_arritmia = arritmia/denominador*100,
+         prev_coagulo = coagulo/denominador*100,
+         prev_reumato = reumato/denominador*100,
+         prev_valvular = valvular/denominador*100,
+         prev_circ_pulm = circ_pulm/denominador*100,
+         prev_neuro = neuro/denominador*100,
+         prev_stroke = stroke/denominador*100,
+         prev_dementia = dementia/denominador*100,
+         prev_CI = CI/denominador*100,
+         prev_ICC = ICC/denominador*100,
+         prev_vascular_periferica = vascular_periferica/denominador*100,
+         prev_COPD = COPD/denominador*100,
+         prev_peptic = peptic/denominador*100,
+         prev_plegia = plegia/denominador*100,
+         prev_IRC = IRC/denominador*100,
+         prev_liver = liver/denominador*100,
+         prev_SIDA = SIDA/denominador*100,
+         prev_diu = diu/denominador*100)
+
+
+
+prevs_generalista$esp <- c("Generalist")
+prevs_familia$esp <- c("Family Physician")
+
+
+
+geral <- rbind(prevs_familia, prevs_generalista)
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_HAS, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of HYPERTENSION among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_HAScomplicada, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of COMPLICATIONS RELATED TO HYPERTENSION among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_DMOK, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of TYPE 2 DIABETES MELLITUS among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_DMcomplica, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of COMPLICATIONS RELATED TO TYPE 2 DIABETES MELLITUS among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_dislipidemia, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of DYSLIPIDEMIA among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_psicoses, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of PSYCHOSIS among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_depre, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of DEPRESSION among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_drogas, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of ILICIT DRUG ABUSE among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_arritmia, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of CARDIAC ARRYTHMIAS among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_ICC, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of HEART FAILURE among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_COPD, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of COPD among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_SIDA, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of AIDS/HIV among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_diu, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of IUD among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_IRC, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of KIDNEY FAILURE among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_dementia, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of DEMENTIA among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_alcool, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of ALCOHOL ABUSE among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+
+
+```{r}
+
+library("tseries")    
+
+comb_ts <- prevs[,c(33:62)] # please make sure the length of both your timeseries
+
+comb_ts <- comb_ts[c(15:82),]
+plot.ts(comb_ts)
+
+
+ggplot(prevs,aes(month, prev_diu)) + geom_line(aes(color="First line")) +
+  geom_line(data = df2, aes(color="Second line")) +
+  labs(color="Legend text")
+
+library(psych)
+psych::describe(comb_ts)
+
+summarytools::descr(comb_ts)
+
+summarytools::dfSummary(comb_ts)
+
+```
+
+
+
+
+
+## exemplo para o stackoverflow
+
+```{r}
+
+library(lubridate)
+HBP <- as.Date(c(NA, NA, "2013-08-01", NA, "2017-11-01", NA, NA, NA, NA, NA))
+
+min <- as.Date(c("2017-05-19", "2013-03-27", "2013-08-01", "2013-04-24", "2013-05-08", 
+                 "2013-03-21","2013-04-08","2013-08-01","2016-09-12", "2016-06-13"))
+
+max <- as.Date(c("2017-05-19","2014-09-12","2018-09-24","2013-04-24","2018-07-31",
+                 "2018-04-17","2018-04-11","2017-02-07","2016-09-12", "2016-06-13"))
+
+df <- data.frame(HBP, min, max)
+
+month <- round_date(seq.Date(as.Date("2012-02-02"), as.Date("2018-11-08"), by = "months"), "month")
+
+
+df$interval <- interval(df$min, df$max)
+
+df$month1 <- month[1] %within% df$interval
+df$month2 <- month[2] %within% df$interval
+
+
+df$month65 <- month[65] %within% df$interval
+
+
+dummies <- lapply(month, function(x) {sum(x %within% df$interval})
+dummies <- as.data.frame(matrix(unlist(dummies), ncol = length(month)))
+colnamonth(dummies) <- paste0("month", 1:length(month))
+df <- cbind(df, dummies)
+
+
+```
+
+
+
+
+
+
+
+
+```{r}
+
+medicas_tres <- adultos %>% filter(total_medicas > 0)
+
+generalista_tres <- medicas_tres %>% filter(Generalistpercent == 100)
+
+generalista_tres$interval <- interval(generalista_tres$arrive, generalista_tres$leave_tres)
+denominador <- lapply(month, function(x) {sum(x %within% generalista_tres$interval)})
+
+generalista_tres$intervalHAS <- interval(generalista_tres$HAS, generalista_tres$leave_tres)
+HAS <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalHAS, na.rm = TRUE)})
+
+generalista_tres$intervalHAScomplicada <- interval(generalista_tres$HAScomplicada, generalista_tres$leave_tres)
+HAScomplicada <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalHAScomplicada, na.rm = TRUE)})
+
+generalista_tres$intervalDMOK <- interval(generalista_tres$DMOK, generalista_tres$leave_tres)
+DMOK <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalDMOK, na.rm = TRUE)})
+
+generalista_tres$intervalDMcomplica <- interval(generalista_tres$DMcomplica, generalista_tres$leave_tres)
+DMcomplica <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalDMcomplica, na.rm = TRUE)})
+
+generalista_tres$intervalobesidade <- interval(generalista_tres$obesidade, generalista_tres$leave_tres)
+obesidade <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalobesidade, na.rm = TRUE)})
+
+generalista_tres$intervaldislipidemia <- interval(generalista_tres$dislipidemia, generalista_tres$leave_tres)
+dislipidemia <- lapply(month, function(x) {sum(x %within% generalista_tres$intervaldislipidemia, na.rm = TRUE)})
+
+generalista_tres$intervalanemias <- interval(generalista_tres$anemias, generalista_tres$leave_tres)
+anemias <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalanemias, na.rm = TRUE)})
+
+generalista_tres$intervalalcool <- interval(generalista_tres$alcool, generalista_tres$leave_tres)
+alcool <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalalcool, na.rm = TRUE)})
+
+generalista_tres$intervaldrogas <- interval(generalista_tres$drogas, generalista_tres$leave_tres)
+drogas <- lapply(month, function(x) {sum(x %within% generalista_tres$intervaldrogas, na.rm = TRUE)})
+
+generalista_tres$intervalpsicoses <- interval(generalista_tres$psicoses, generalista_tres$leave_tres)
+psicoses <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalpsicoses, na.rm = TRUE)})
+
+generalista_tres$intervaldepre <- interval(generalista_tres$depre, generalista_tres$leave_tres)
+depre <- lapply(month, function(x) {sum(x %within% generalista_tres$intervaldepre, na.rm = TRUE)})
+
+generalista_tres$intervalhipoT <- interval(generalista_tres$hipoT, generalista_tres$leave_tres)
+hipoT <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalhipoT, na.rm = TRUE)})
+
+generalista_tres$intervalarritmia <- interval(generalista_tres$arritmia, generalista_tres$leave_tres)
+arritmia <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalarritmia, na.rm = TRUE)})
+
+generalista_tres$intervalcoagulo <- interval(generalista_tres$coagulo, generalista_tres$leave_tres)
+coagulo <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalcoagulo, na.rm = TRUE)})
+
+generalista_tres$intervalreumato <- interval(generalista_tres$reumato, generalista_tres$leave_tres)
+reumato <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalreumato, na.rm = TRUE)})
+
+generalista_tres$intervalvalvular <- interval(generalista_tres$valvular, generalista_tres$leave_tres)
+valvular <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalvalvular, na.rm = TRUE)})
+
+generalista_tres$intervalcirc_pulm <- interval(generalista_tres$circ_pulm, generalista_tres$leave_tres)
+circ_pulm <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalcirc_pulm, na.rm = TRUE)})
+
+generalista_tres$intervalneuro <- interval(generalista_tres$neuro, generalista_tres$leave_tres)
+neuro <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalneuro, na.rm = TRUE)})
+
+generalista_tres$intervalstroke <- interval(generalista_tres$stroke, generalista_tres$leave_tres)
+stroke <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalstroke, na.rm = TRUE)})
+
+generalista_tres$intervaldementia <- interval(generalista_tres$dementia, generalista_tres$leave_tres)
+dementia <- lapply(month, function(x) {sum(x %within% generalista_tres$intervaldementia, na.rm = TRUE)})
+
+generalista_tres$intervalCI <- interval(generalista_tres$CI, generalista_tres$leave_tres)
+CI <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalCI, na.rm = TRUE)})
+
+generalista_tres$intervalICC <- interval(generalista_tres$ICC, generalista_tres$leave_tres)
+ICC <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalICC, na.rm = TRUE)})
+
+generalista_tres$intervalvascular_periferica <- interval(generalista_tres$vascular_periferica, generalista_tres$leave_tres)
+vascular_periferica <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalvascular_periferica, na.rm = TRUE)})
+
+generalista_tres$intervalCOPD <- interval(generalista_tres$COPD, generalista_tres$leave_tres)
+COPD <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalCOPD, na.rm = TRUE)})
+
+generalista_tres$intervalpeptic <- interval(generalista_tres$peptic, generalista_tres$leave_tres)
+peptic <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalpeptic, na.rm = TRUE)})
+
+generalista_tres$intervalplegia <- interval(generalista_tres$plegia, generalista_tres$leave_tres)
+plegia <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalplegia, na.rm = TRUE)})
+
+generalista_tres$intervalIRC <- interval(generalista_tres$IRC, generalista_tres$leave_tres)
+IRC <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalIRC, na.rm = TRUE)})
+
+generalista_tres$intervalliver <- interval(generalista_tres$liver, generalista_tres$leave_tres)
+liver <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalliver, na.rm = TRUE)})
+
+generalista_tres$intervalSIDA <- interval(generalista_tres$SIDA, generalista_tres$leave_tres)
+SIDA <- lapply(month, function(x) {sum(x %within% generalista_tres$intervalSIDA, na.rm = TRUE)})
+
+generalista_tres$intervaldiu <- interval(generalista_tres$diu, generalista_tres$leave_tres)
+diu <- lapply(month, function(x) {sum(x %within% generalista_tres$intervaldiu, na.rm = TRUE)})
+
+mes <- as.numeric(month)
+
+df_generalista_tres <- do.call(rbind.data.frame, 
+              Map('c', mes, denominador, HAS, HAScomplicada, DMOK, 
+                  DMcomplica, obesidade, dislipidemia, anemias, alcool,
+                  drogas, psicoses, depre, hipoT, arritmia, coagulo, reumato, 
+                  valvular, circ_pulm, neuro, stroke, dementia, CI, ICC,
+                  vascular_periferica, COPD, peptic, plegia, IRC, liver, SIDA, diu))
+
+
+colnames(df_generalista_tres) <- c("month", "denominador", "HAS", "HAScomplicada", "DMOK", "DMcomplica", "obesidade",
+                  "dislipidemia", "anemias", "alcool", "drogas", "psicoses", "depre", "hipoT", "arritmia",
+                  "coagulo", "reumato", "valvular", "circ_pulm", "neuro", "stroke", "dementia", "CI",
+                  "ICC", "vascular_periferica", "COPD", "peptic", "plegia", "IRC", "liver", "SIDA", "diu")
+
+df_generalista_tres$month <- as.Date(df_generalista_tres$month, origin = "1970-01-01")
+
+
+# save(df_generalista, file = "C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\df_generalista.RData")
+
+##
+
+familia_tres <- medicas %>% filter(Generalistpercent == 0)
+
+familia_tres$interval <- interval(familia_tres$arrive, familia_tres$leave_tres)
+denominador <- lapply(month, function(x) {sum(x %within% familia_tres$interval)})
+
+familia_tres$intervalHAS <- interval(familia_tres$HAS, familia_tres$leave_tres)
+HAS <- lapply(month, function(x) {sum(x %within% familia_tres$intervalHAS, na.rm = TRUE)})
+
+familia_tres$intervalHAScomplicada <- interval(familia_tres$HAScomplicada, familia_tres$leave_tres)
+HAScomplicada <- lapply(month, function(x) {sum(x %within% familia_tres$intervalHAScomplicada, na.rm = TRUE)})
+
+familia_tres$intervalDMOK <- interval(familia_tres$DMOK, familia_tres$leave_tres)
+DMOK <- lapply(month, function(x) {sum(x %within% familia_tres$intervalDMOK, na.rm = TRUE)})
+
+familia_tres$intervalDMcomplica <- interval(familia_tres$DMcomplica, familia_tres$leave_tres)
+DMcomplica <- lapply(month, function(x) {sum(x %within% familia_tres$intervalDMcomplica, na.rm = TRUE)})
+
+familia_tres$intervalobesidade <- interval(familia_tres$obesidade, familia_tres$leave_tres)
+obesidade <- lapply(month, function(x) {sum(x %within% familia_tres$intervalobesidade, na.rm = TRUE)})
+
+familia_tres$intervaldislipidemia <- interval(familia_tres$dislipidemia, familia_tres$leave_tres)
+dislipidemia <- lapply(month, function(x) {sum(x %within% familia_tres$intervaldislipidemia, na.rm = TRUE)})
+
+familia_tres$intervalanemias <- interval(familia_tres$anemias, familia_tres$leave_tres)
+anemias <- lapply(month, function(x) {sum(x %within% familia_tres$intervalanemias, na.rm = TRUE)})
+
+familia_tres$intervalalcool <- interval(familia_tres$alcool, familia_tres$leave_tres)
+alcool <- lapply(month, function(x) {sum(x %within% familia_tres$intervalalcool, na.rm = TRUE)})
+
+familia_tres$intervaldrogas <- interval(familia_tres$drogas, familia_tres$leave_tres)
+drogas <- lapply(month, function(x) {sum(x %within% familia_tres$intervaldrogas, na.rm = TRUE)})
+
+familia_tres$intervalpsicoses <- interval(familia_tres$psicoses, familia_tres$leave_tres)
+psicoses <- lapply(month, function(x) {sum(x %within% familia_tres$intervalpsicoses, na.rm = TRUE)})
+
+familia_tres$intervaldepre <- interval(familia_tres$depre, familia_tres$leave_tres)
+depre <- lapply(month, function(x) {sum(x %within% familia_tres$intervaldepre, na.rm = TRUE)})
+
+familia_tres$intervalhipoT <- interval(familia_tres$hipoT, familia_tres$leave_tres)
+hipoT <- lapply(month, function(x) {sum(x %within% familia_tres$intervalhipoT, na.rm = TRUE)})
+
+familia_tres$intervalarritmia <- interval(familia_tres$arritmia, familia_tres$leave_tres)
+arritmia <- lapply(month, function(x) {sum(x %within% familia_tres$intervalarritmia, na.rm = TRUE)})
+
+familia_tres$intervalcoagulo <- interval(familia_tres$coagulo, familia_tres$leave_tres)
+coagulo <- lapply(month, function(x) {sum(x %within% familia_tres$intervalcoagulo, na.rm = TRUE)})
+
+familia_tres$intervalreumato <- interval(familia_tres$reumato, familia_tres$leave_tres)
+reumato <- lapply(month, function(x) {sum(x %within% familia_tres$intervalreumato, na.rm = TRUE)})
+
+familia_tres$intervalvalvular <- interval(familia_tres$valvular, familia_tres$leave_tres)
+valvular <- lapply(month, function(x) {sum(x %within% familia_tres$intervalvalvular, na.rm = TRUE)})
+
+familia_tres$intervalcirc_pulm <- interval(familia_tres$circ_pulm, familia_tres$leave_tres)
+circ_pulm <- lapply(month, function(x) {sum(x %within% familia_tres$intervalcirc_pulm, na.rm = TRUE)})
+
+familia_tres$intervalneuro <- interval(familia_tres$neuro, familia_tres$leave_tres)
+neuro <- lapply(month, function(x) {sum(x %within% familia_tres$intervalneuro, na.rm = TRUE)})
+
+familia_tres$intervalstroke <- interval(familia_tres$stroke, familia_tres$leave_tres)
+stroke <- lapply(month, function(x) {sum(x %within% familia_tres$intervalstroke, na.rm = TRUE)})
+
+familia_tres$intervaldementia <- interval(familia_tres$dementia, familia_tres$leave_tres)
+dementia <- lapply(month, function(x) {sum(x %within% familia_tres$intervaldementia, na.rm = TRUE)})
+
+familia_tres$intervalCI <- interval(familia_tres$CI, familia_tres$leave_tres)
+CI <- lapply(month, function(x) {sum(x %within% familia_tres$intervalCI, na.rm = TRUE)})
+
+familia_tres$intervalICC <- interval(familia_tres$ICC, familia_tres$leave_tres)
+ICC <- lapply(month, function(x) {sum(x %within% familia_tres$intervalICC, na.rm = TRUE)})
+
+familia_tres$intervalvascular_periferica <- interval(familia_tres$vascular_periferica, familia_tres$leave_tres)
+vascular_periferica <- lapply(month, function(x) {sum(x %within% familia_tres$intervalvascular_periferica, na.rm = TRUE)})
+
+familia_tres$intervalCOPD <- interval(familia_tres$COPD, familia_tres$leave_tres)
+COPD <- lapply(month, function(x) {sum(x %within% familia_tres$intervalCOPD, na.rm = TRUE)})
+
+familia_tres$intervalpeptic <- interval(familia_tres$peptic, familia_tres$leave_tres)
+peptic <- lapply(month, function(x) {sum(x %within% familia_tres$intervalpeptic, na.rm = TRUE)})
+
+familia_tres$intervalplegia <- interval(familia_tres$plegia, familia_tres$leave_tres)
+plegia <- lapply(month, function(x) {sum(x %within% familia_tres$intervalplegia, na.rm = TRUE)})
+
+familia_tres$intervalIRC <- interval(familia_tres$IRC, familia_tres$leave_tres)
+IRC <- lapply(month, function(x) {sum(x %within% familia_tres$intervalIRC, na.rm = TRUE)})
+
+familia_tres$intervalliver <- interval(familia_tres$liver, familia_tres$leave_tres)
+liver <- lapply(month, function(x) {sum(x %within% familia_tres$intervalliver, na.rm = TRUE)})
+
+familia_tres$intervalSIDA <- interval(familia_tres$SIDA, familia_tres$leave_tres)
+SIDA <- lapply(month, function(x) {sum(x %within% familia_tres$intervalSIDA, na.rm = TRUE)})
+
+familia_tres$intervaldiu <- interval(familia_tres$diu, familia_tres$leave_tres)
+diu <- lapply(month, function(x) {sum(x %within% familia_tres$intervaldiu, na.rm = TRUE)})
+
+mes <- as.numeric(month)
+
+df_familia_tres <- do.call(rbind.data.frame, 
+              Map('c', mes, denominador, HAS, HAScomplicada, DMOK, 
+                  DMcomplica, obesidade, dislipidemia, anemias, alcool,
+                  drogas, psicoses, depre, hipoT, arritmia, coagulo, reumato, 
+                  valvular, circ_pulm, neuro, stroke, dementia, CI, ICC,
+                  vascular_periferica, COPD, peptic, plegia, IRC, liver, SIDA, diu))
+
+
+colnames(df_familia_tres) <- c("month", "denominador", "HAS", "HAScomplicada", "DMOK", "DMcomplica", "obesidade",
+                  "dislipidemia", "anemias", "alcool", "drogas", "psicoses", "depre", "hipoT", "arritmia",
+                  "coagulo", "reumato", "valvular", "circ_pulm", "neuro", "stroke", "dementia", "CI",
+                  "ICC", "vascular_periferica", "COPD", "peptic", "plegia", "IRC", "liver", "SIDA", "diu")
+
+df_familia_tres$month <- as.Date(df_familia_tres$month, origin = "1970-01-01")
+
+# save(df_familia, file = "C:\\Users\\Adelson\\Desktop\\pendrive\\roteiros\\base\\df_familia.RData")
+
+df_generalista_tres <- df_generalista_tres %>% filter(month > "2013-04-01")
+
+prevs_generalista_tres <- df_generalista_tres %>% 
+  mutate(prev_HAS = HAS/denominador*100,
+         prev_HAScomplicada = HAScomplicada/denominador*100,
+         prev_DMOK = DMOK/denominador*100,
+         prev_DMcomplica = DMcomplica/denominador*100,
+         prev_obesidade = obesidade/denominador*100,
+         prev_dislipidemia = dislipidemia/denominador*100,
+         prev_anemias = anemias/denominador*100,
+         prev_alcool = alcool/denominador*100,
+         prev_drogas = drogas/denominador*100,
+         prev_DMcomplica = DMcomplica/denominador*100,
+         prev_psicoses = psicoses/denominador*100,
+         prev_depre = depre/denominador*100,
+         prev_hipoT = hipoT/denominador*100,
+         prev_arritmia = arritmia/denominador*100,
+         prev_coagulo = coagulo/denominador*100,
+         prev_reumato = reumato/denominador*100,
+         prev_valvular = valvular/denominador*100,
+         prev_circ_pulm = circ_pulm/denominador*100,
+         prev_neuro = neuro/denominador*100,
+         prev_stroke = stroke/denominador*100,
+         prev_dementia = dementia/denominador*100,
+         prev_CI = CI/denominador*100,
+         prev_ICC = ICC/denominador*100,
+         prev_vascular_periferica = vascular_periferica/denominador*100,
+         prev_COPD = COPD/denominador*100,
+         prev_peptic = peptic/denominador*100,
+         prev_plegia = plegia/denominador*100,
+         prev_IRC = IRC/denominador*100,
+         prev_liver = liver/denominador*100,
+         prev_SIDA = SIDA/denominador*100,
+         prev_diu = diu/denominador*100)
+
+df_familia_tres <- df_familia_tres %>% filter(month > "2013-04-01")
+
+prevs_familia_tres <- df_familia_tres %>% 
+  mutate(prev_HAS = HAS/denominador*100,
+         prev_HAScomplicada = HAScomplicada/denominador*100,
+         prev_DMOK = DMOK/denominador*100,
+         prev_DMcomplica = DMcomplica/denominador*100,
+         prev_obesidade = obesidade/denominador*100,
+         prev_dislipidemia = dislipidemia/denominador*100,
+         prev_anemias = anemias/denominador*100,
+         prev_alcool = alcool/denominador*100,
+         prev_drogas = drogas/denominador*100,
+         prev_DMcomplica = DMcomplica/denominador*100,
+         prev_psicoses = psicoses/denominador*100,
+         prev_depre = depre/denominador*100,
+         prev_hipoT = hipoT/denominador*100,
+         prev_arritmia = arritmia/denominador*100,
+         prev_coagulo = coagulo/denominador*100,
+         prev_reumato = reumato/denominador*100,
+         prev_valvular = valvular/denominador*100,
+         prev_circ_pulm = circ_pulm/denominador*100,
+         prev_neuro = neuro/denominador*100,
+         prev_stroke = stroke/denominador*100,
+         prev_dementia = dementia/denominador*100,
+         prev_CI = CI/denominador*100,
+         prev_ICC = ICC/denominador*100,
+         prev_vascular_periferica = vascular_periferica/denominador*100,
+         prev_COPD = COPD/denominador*100,
+         prev_peptic = peptic/denominador*100,
+         prev_plegia = plegia/denominador*100,
+         prev_IRC = IRC/denominador*100,
+         prev_liver = liver/denominador*100,
+         prev_SIDA = SIDA/denominador*100,
+         prev_diu = diu/denominador*100)
+
+
+prevs_generalista_tres$esp <- c("Generalist")
+prevs_familia_tres$esp <- c("Family Physician")
+
+
+
+geral_tres <- rbind(prevs_familia_tres, prevs_generalista_tres)
+
+```
+
+
+
+```{r}
+
+ggplot(geral, aes(month, prev_HAS, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of HBP among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years") 
+
+```
+
+
+```{r}
+
+ggplot(geral_tres, aes(month, prev_HAS, color = esp)) + 
+  geom_smooth() +
+  labs(title = "Prevalence of HBP among adult patients treated by \nFamily Physicians and Generalists in Primary Care", subtitle = "Evolution from 2013 until 2018 in Rio de Janeiro", colour = "Specialty") +
+  ylab("Prevalence") + xlab("years")
+
+
+```
+
